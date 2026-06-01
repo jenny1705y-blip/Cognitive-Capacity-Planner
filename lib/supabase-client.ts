@@ -1,4 +1,8 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+
+declare global {
+  var __plannerSupabase: SupabaseClient | undefined;
+}
 
 export function createBrowserSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -8,5 +12,8 @@ export function createBrowserSupabase() {
     throw new Error("Missing Supabase browser environment variables.");
   }
 
-  return createClient(url, anonKey);
+  if (globalThis.__plannerSupabase) return globalThis.__plannerSupabase;
+
+  globalThis.__plannerSupabase = createClient(url, anonKey);
+  return globalThis.__plannerSupabase;
 }

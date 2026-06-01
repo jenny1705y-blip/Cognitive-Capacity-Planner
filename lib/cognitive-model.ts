@@ -2,8 +2,8 @@ import type { CaffeineLog, CapacityPoint, Chronotype, SleepLog, StudyTask } from
 
 const MS_PER_HOUR = 1000 * 60 * 60;
 
-function sleepPressureAwake(hoursAwake: number, tau = 18.2) {
-  return 1 - Math.exp(-Math.max(hoursAwake, 0) / tau);
+function sleepPressureAwakeFrom(initialPressure: number, hoursAwake: number, tau = 18.2) {
+  return 1 - (1 - clamp(initialPressure, 0, 1)) * Math.exp(-Math.max(hoursAwake, 0) / tau);
 }
 
 function sleepPressureAsleep(sAtBedtime: number, hoursAsleep: number, tau = 4.2) {
@@ -32,6 +32,38 @@ export function peakHourForChronotype(chronotype: Chronotype) {
   return 17;
 }
 
+export function estimateCaffeineSleepForecast({
+  doseMg,
+  consumedAt,
+  baselineBedHour = 23,
+  thresholdMg = 25
+}: {
+  doseMg: number;
+  consumedAt: Date;
+  baselineBedHour?: number;
+  thresholdMg?: number;
+}) {
+  const baselineBedtime = new Date(consumedAt);
+  baselineBedtime.setHours(baselineBedHour, 0, 0, 0);
+  if (baselineBedtime.getTime() <= consumedAt.getTime()) baselineBedtime.setDate(baselineBedtime.getDate() + 1);
+
+  const elapsedToBaseline = (baselineBedtime.getTime() - consumedAt.getTime()) / MS_PER_HOUR;
+  const remainingAtBaselineMg = caffeineRemaining(Math.max(doseMg, 0), elapsedToBaseline);
+  const hoursUntilThreshold = doseMg <= thresholdMg ? 0 : 5 * Math.log2(doseMg / thresholdMg);
+  const clearsBelowThresholdAt = new Date(consumedAt.getTime() + hoursUntilThreshold * MS_PER_HOUR);
+  const estimatedSleepWindow = new Date(Math.max(baselineBedtime.getTime(), clearsBelowThresholdAt.getTime()));
+  estimatedSleepWindow.setMinutes(Math.ceil(estimatedSleepWindow.getMinutes() / 15) * 15, 0, 0);
+
+  return {
+    baselineBedtime,
+    remainingAtBaselineMg: Math.round(remainingAtBaselineMg),
+    clearsBelowThresholdAt,
+    estimatedSleepWindow,
+    delayMinutes: Math.max(0, Math.round((estimatedSleepWindow.getTime() - baselineBedtime.getTime()) / (60 * 1000))),
+    thresholdMg
+  };
+}
+
 export function buildCapacityCurve({
   start,
   sleepLogs,
@@ -47,28 +79,50 @@ export function buildCapacityCurve({
 }): CapacityPoint[] {
   const peakHour = peakHourForChronotype(chronotype);
   const latestSleep = [...sleepLogs]
-    .filter((log) => new Date(log.sleep_end).getTime() <= start.getTime())
+    .filter((log) => {
+      const sleepStart = new Date(log.sleep_start).getTime();
+      const sleepEnd = new Date(log.sleep_end).getTime();
+      const duration = (sleepEnd - sleepStart) / MS_PER_HOUR;
+      return sleepEnd <= start.getTime() && duration > 0 && duration <= 18;
+    })
     .sort((a, b) => new Date(b.sleep_end).getTime() - new Date(a.sleep_end).getTime())[0];
 
   const wakeTime = latestSleep ? new Date(latestSleep.sleep_end) : new Date(start);
-  wakeTime.setHours(7, 0, 0, 0);
+  const sleepDuration = latestSleep
+    ? (new Date(latestSleep.sleep_end).getTime() - new Date(latestSleep.sleep_start).getTime()) / MS_PER_HOUR
+    : 8;
+  const pressureAtWake = sleepPressureAsleep(0.9, sleepDuration);
+  if (!latestSleep) {
+    wakeTime.setHours(7, 0, 0, 0);
+    if (wakeTime.getTime() > start.getTime()) wakeTime.setDate(wakeTime.getDate() - 1);
+  }
 
-  const raw = Array.from({ length: 97 }, (_, index) => {
+  const nextBedtime = new Date(start);
+  nextBedtime.setHours(23, 0, 0, 0);
+  if (nextBedtime.getTime() <= start.getTime()) nextBedtime.setDate(nextBedtime.getDate() + 1);
+
+  const nextWakeTime = new Date(nextBedtime.getTime() + 8 * MS_PER_HOUR);
+  const pressureAtBedtime = sleepPressureAwakeFrom(
+    pressureAtWake,
+    (nextBedtime.getTime() - wakeTime.getTime()) / MS_PER_HOUR
+  );
+  const pressureAfterPlannedSleep = sleepPressureAsleep(pressureAtBedtime, 8);
+
+  return Array.from({ length: 97 }, (_, index) => {
     const hour = index * 0.25;
     const instant = new Date(start.getTime() + hour * MS_PER_HOUR);
     const clockHour = instant.getHours() + instant.getMinutes() / 60;
-    const bedtime = new Date(instant);
-    bedtime.setHours(23, 0, 0, 0);
 
     let sleepPressure: number;
-    if (instant.getHours() >= 23 || instant.getHours() < 7) {
-      const bedStart = new Date(instant);
-      if (instant.getHours() < 7) bedStart.setDate(bedStart.getDate() - 1);
-      bedStart.setHours(23, 0, 0, 0);
-      const sAtBedtime = sleepPressureAwake((bedStart.getTime() - wakeTime.getTime()) / MS_PER_HOUR);
-      sleepPressure = sleepPressureAsleep(sAtBedtime, (instant.getTime() - bedStart.getTime()) / MS_PER_HOUR);
+    if (instant.getTime() < nextBedtime.getTime()) {
+      sleepPressure = sleepPressureAwakeFrom(pressureAtWake, (instant.getTime() - wakeTime.getTime()) / MS_PER_HOUR);
+    } else if (instant.getTime() < nextWakeTime.getTime()) {
+      sleepPressure = sleepPressureAsleep(pressureAtBedtime, (instant.getTime() - nextBedtime.getTime()) / MS_PER_HOUR);
     } else {
-      sleepPressure = sleepPressureAwake((instant.getTime() - wakeTime.getTime()) / MS_PER_HOUR);
+      sleepPressure = sleepPressureAwakeFrom(
+        pressureAfterPlannedSleep,
+        (instant.getTime() - nextWakeTime.getTime()) / MS_PER_HOUR
+      );
     }
 
     const conditionS = 1 - clamp(sleepPressure, 0, 1);
@@ -87,22 +141,9 @@ export function buildCapacityCurve({
       processS: conditionS,
       processC,
       caffeine: caffeineEffect,
-      rawScore
+      score: Math.round(clamp(rawScore, 0, 1) * 100)
     };
   });
-
-  const min = Math.min(...raw.map((point) => point.rawScore));
-  const max = Math.max(...raw.map((point) => point.rawScore));
-
-  return raw.map((point) => ({
-    hour: point.hour,
-    clockHour: point.clockHour,
-    label: point.label,
-    processS: point.processS,
-    processC: point.processC,
-    caffeine: point.caffeine,
-    score: Math.round(((point.rawScore - min) / Math.max(max - min, 0.001)) * 100)
-  }));
 }
 
 export function recommendedBandForTask(task: StudyTask) {

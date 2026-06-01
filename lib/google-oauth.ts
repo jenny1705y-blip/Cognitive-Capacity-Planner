@@ -1,5 +1,8 @@
 import { createAdminSupabase } from "@/lib/supabase-admin";
 
+const GOOGLE_CALENDAR_EVENTS_SCOPE = "https://www.googleapis.com/auth/calendar.events";
+const GOOGLE_CALENDAR_FREEBUSY_SCOPE = "https://www.googleapis.com/auth/calendar.freebusy";
+
 type GoogleTokenResponse = {
   access_token: string;
   refresh_token?: string;
@@ -8,6 +11,11 @@ type GoogleTokenResponse = {
   token_type?: string;
   id_token?: string;
 };
+
+export function hasRequiredGoogleCalendarScopes(scope?: string | null) {
+  const scopes = new Set((scope ?? "").split(" ").filter(Boolean));
+  return scopes.has(GOOGLE_CALENDAR_EVENTS_SCOPE) && scopes.has(GOOGLE_CALENDAR_FREEBUSY_SCOPE);
+}
 
 export function googleAuthUrl(userId: string) {
   const clientId = process.env.GOOGLE_CLIENT_ID;
@@ -23,8 +31,9 @@ export function googleAuthUrl(userId: string) {
     response_type: "code",
     access_type: "offline",
     prompt: "consent",
+    include_granted_scopes: "true",
     state: userId,
-    scope: "openid email profile https://www.googleapis.com/auth/calendar.events"
+    scope: `openid email profile ${GOOGLE_CALENDAR_EVENTS_SCOPE} ${GOOGLE_CALENDAR_FREEBUSY_SCOPE}`
   });
 
   return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
@@ -68,6 +77,9 @@ export async function refreshGoogleAccessToken(userId: string) {
 
   if (error || !tokenRow?.refresh_token) {
     throw new Error("Google Calendar is not connected yet.");
+  }
+  if (!hasRequiredGoogleCalendarScopes(tokenRow.scope)) {
+    throw new Error("Reconnect Google Calendar to grant event and availability access.");
   }
 
   const expiresAt = tokenRow.expires_at ? new Date(tokenRow.expires_at).getTime() : 0;

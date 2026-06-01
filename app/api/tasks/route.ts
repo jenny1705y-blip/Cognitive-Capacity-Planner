@@ -32,3 +32,17 @@ export async function POST(request: Request) {
   if (writeError) return jsonError(writeError.message, 400);
   return Response.json({ task: data });
 }
+
+export async function DELETE(request: Request) {
+  const { error, user, token } = await getUserFromRequest(request);
+  if (error || !user || !token) return jsonError(error ?? "Unauthorized", 401);
+
+  const id = new URL(request.url).searchParams.get("id");
+  if (!id) return jsonError("Missing task id.", 400);
+
+  const supabase = createRequestSupabase(token);
+  const { error: deleteError } = await supabase.from("tasks").delete().eq("id", id).eq("user_id", user.id);
+
+  if (deleteError) return jsonError(deleteError.message, 400);
+  return Response.json({ ok: true });
+}

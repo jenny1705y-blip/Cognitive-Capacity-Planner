@@ -106,9 +106,20 @@ h2 {
   background: var(--teal);
 }
 
+.connectedButton {
+  border-color: #99d8cb;
+  color: #0f5f56;
+  background: #ecfdf8;
+}
+
 .primaryButton:disabled {
   cursor: not-allowed;
   opacity: 0.55;
+}
+
+.secondaryButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .full {
@@ -136,20 +147,39 @@ h2 {
   background: #fff1f2;
 }
 
+.connectionLine {
+  margin: -4px 0 14px;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
 .dashboard {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 12px;
   margin-bottom: 16px;
 }
 
 .metricPanel {
+  position: relative;
   gap: 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 18px;
   background: var(--panel);
   box-shadow: var(--shadow);
+}
+
+.metricPanel small {
+  position: absolute;
+  right: 18px;
+  bottom: 7px;
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.clockValue {
+  font-variant-numeric: tabular-nums;
 }
 
 .metricPanel span {
@@ -194,6 +224,12 @@ h2 {
   margin-bottom: 0;
 }
 
+.sectionHint {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
 .chartShell {
   overflow: hidden;
   border: 1px solid var(--line);
@@ -223,8 +259,67 @@ h2 {
   stroke-dasharray: 5 5;
 }
 
+.blockHitLine {
+  stroke: transparent;
+  stroke-width: 18;
+  pointer-events: stroke;
+}
+
 .blockDot {
   fill: var(--amber);
+}
+
+.blockIndexLabel {
+  fill: white;
+  font-size: 10px;
+  font-weight: 800;
+  pointer-events: none;
+  text-anchor: middle;
+}
+
+.taskMarker {
+  cursor: help;
+  outline: none;
+}
+
+.taskMarker:hover .blockLine,
+.taskMarker:focus .blockLine {
+  stroke-width: 3;
+}
+
+.taskMarker:hover .blockDot,
+.taskMarker:focus .blockDot {
+  r: 11;
+}
+
+.markerTooltip {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+.taskMarker:hover .markerTooltip,
+.taskMarker:focus .markerTooltip {
+  opacity: 1;
+}
+
+.markerTooltip rect {
+  fill: #17201d;
+}
+
+.markerTooltipTitle,
+.markerTooltipTime {
+  fill: white;
+  font-size: 11px;
+}
+
+.markerTooltipTitle {
+  font-weight: 750;
+}
+
+.markerTooltipTime {
+  fill: #dce2dc;
+  font-size: 9px;
 }
 
 .timeline {
@@ -243,7 +338,8 @@ h2 {
 }
 
 .blockItem div,
-.taskList article {
+.taskList article div,
+.historyItem div:first-child {
   display: grid;
   gap: 3px;
 }
@@ -260,6 +356,49 @@ h2 {
   margin: 10px 0 0;
 }
 
+.modelInsight {
+  margin: 10px 0 0;
+  border-left: 3px solid #99d8cb;
+  padding: 7px 9px;
+  color: #0f5f56;
+  background: #f1fbf8;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.caffeinePreview {
+  display: grid;
+  gap: 5px;
+  margin: 4px 0 10px;
+  border-left: 3px solid #f59e0b;
+  padding: 9px 10px;
+  background: #fffbeb;
+}
+
+.caffeinePreview span {
+  color: #92400e;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.caffeinePreview strong {
+  color: #78350f;
+  font-size: 0.82rem;
+}
+
+.caffeinePreview p,
+.caffeinePreview small {
+  margin: 0;
+  color: #92400e;
+  font-size: 0.74rem;
+  line-height: 1.4;
+}
+
+.caffeinePreview small {
+  color: #a16207;
+}
+
 .blockItem b {
   border-radius: 999px;
   min-width: 46px;
@@ -267,6 +406,19 @@ h2 {
   text-align: center;
   color: white;
   background: var(--blue);
+}
+
+.blockIndex {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 999px;
+  color: white;
+  background: var(--amber);
+  font-size: 0.75rem;
+  font-weight: 800;
 }
 
 .panel {
@@ -280,6 +432,114 @@ h2 {
 .panel h2 {
   gap: 8px;
   margin-bottom: 14px;
+}
+
+.panelTitleRow,
+.historyHeader,
+.historyItem,
+.itemActions,
+.taskList article {
+  display: flex;
+  align-items: center;
+}
+
+.panelTitleRow,
+.historyHeader,
+.historyItem,
+.taskList article {
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.panelTitleRow {
+  margin-bottom: 14px;
+}
+
+.panelTitleRow h2 {
+  margin: 0;
+}
+
+.historyHeader {
+  margin-top: 14px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.historyHeader span,
+.itemActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.historyHeader b {
+  border-radius: 999px;
+  padding: 2px 7px;
+  color: var(--ink);
+  background: #edf1ed;
+}
+
+.historyList {
+  display: grid;
+  gap: 7px;
+  margin-top: 9px;
+}
+
+.historyItem {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 9px;
+  background: #fbfcfa;
+}
+
+.historyItem.invalid {
+  border-color: #fecdd3;
+  background: #fff8f8;
+}
+
+.historyItem.invalid strong {
+  color: var(--rose);
+}
+
+.historyItem span {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.iconButton {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  color: var(--muted);
+  background: white;
+}
+
+.iconButton:hover {
+  border-color: #b7c5bd;
+  color: var(--ink);
+}
+
+.iconButton.danger:hover {
+  border-color: #fecdd3;
+  color: var(--rose);
+  background: #fff1f2;
+}
+
+.textButton {
+  border: 0;
+  padding: 4px 0;
+  color: var(--teal);
+  background: transparent;
+  font-size: 0.82rem;
+  font-weight: 750;
 }
 
 label {
@@ -341,6 +601,10 @@ select {
   overflow: auto;
 }
 
+.calendarTaskButton {
+  margin-bottom: 10px;
+}
+
 .taskList article {
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -370,7 +634,7 @@ select {
   }
 
   .dashboard {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, 1fr);
   }
 
   .sideColumn {
@@ -386,5 +650,9 @@ select {
 
   .metricPanel strong {
     font-size: 1.3rem;
+  }
+
+  .dashboard {
+    grid-template-columns: 1fr;
   }
 }
