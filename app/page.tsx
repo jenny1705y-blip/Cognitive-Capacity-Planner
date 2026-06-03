@@ -3,8 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Brain,
-  CalendarPlus,
+  CalendarClock,
   CalendarCheck,
+  CalendarPlus,
+  ChevronDown,
+  ChevronUp,
   Clock3,
   Coffee,
   History,
@@ -12,12 +15,14 @@ import {
   Moon,
   Pencil,
   Plus,
+  RotateCcw,
   Sparkles,
   Trash2,
   TimerReset
 } from "lucide-react";
 import { createBrowserSupabase } from "@/lib/supabase-client";
 import { buildCapacityCurve, estimateCaffeineSleepForecast, recommendedBandForTask } from "@/lib/cognitive-model";
+import { decodeCalendarTaskProvenance } from "@/lib/task-provenance";
 import type { CaffeineLog, Chronotype, ScheduleBlock, SleepLog, StudyTask } from "@/lib/types";
 
 type Notice = { type: "good" | "bad" | "neutral"; message: string } | null;
@@ -27,6 +32,12 @@ const INITIAL_PLANNER_START = "2026-05-10T12:00:00.000Z";
 const STARTUP_TIMEOUT_MS = 4000;
 const DEFAULT_API_TIMEOUT_MS = 8000;
 const AGENT_TIMEOUT_MS = 60000;
+const DEMO_CLOCK_STORAGE_KEY = "cognitive-capacity-planner-demo-clock";
+
+type DemoClockAnchor = {
+  plannerAt: string;
+  deviceAt: string;
+};
 
 function toLocalInput(date: Date) {
   const offset = date.getTimezoneOffset();
@@ -81,6 +92,65 @@ function dedupeScheduleBlocks(blocks: ScheduleBlock[]) {
     seen.add(key);
     return true;
   });
+}
+
+function readDemoClockAnchor() {
+  try {
+    const saved = window.localStorage.getItem(DEMO_CLOCK_STORAGE_KEY);
+    if (!saved) return null;
+    const parsed = JSON.parse(saved) as Partial<DemoClockAnchor>;
+    if (
+      typeof parsed.plannerAt !== "string" ||
+      typeof parsed.deviceAt !== "string" ||
+      Number.isNaN(new Date(parsed.plannerAt).getTime()) ||
+      Number.isNaN(new Date(parsed.deviceAt).getTime())
+    ) {
+      return null;
+    }
+    return parsed as DemoClockAnchor;
+  } catch {
+    return null;
+  }
+}
+
+function plannerNowFromAnchor(deviceNow: Date, anchor: DemoClockAnchor | null) {
+  if (!anchor) return deviceNow;
+  const elapsed = deviceNow.getTime() - new Date(anchor.deviceAt).getTime();
+  return new Date(new Date(anchor.plannerAt).getTime() + elapsed);
+}
+
+function activeStudyTasks(tasks: StudyTask[], plannerNow?: Date) {
+  return tasks.filter(
+    (task) =>
+      task.status !== "completed" &&
+      task.status !== "archived" &&
+      (!plannerNow || !task.due_at || new Date(task.due_at).getTime() > plannerNow.getTime())
+  );
+}
+
+function tasksBeforePlannerNow(tasks: StudyTask[], blocks: ScheduleBlock[], plannerNow: Date) {
+  const expiredBlocks = blocks.filter((block) => new Date(block.end_at).getTime() <= plannerNow.getTime());
+  const expiredTaskIds = new Set(expiredBlocks.flatMap((block) => (block.task_id ? [block.task_id] : [])));
+  const expiredTitles = new Set(expiredBlocks.map((block) => block.title.trim().toLowerCase()));
+
+  return activeStudyTasks(tasks, plannerNow).filter(
+    (task) => !(task.id && expiredTaskIds.has(task.id)) && !expiredTitles.has(task.title.trim().toLowerCase())
+  );
+}
+
+function tasksMissingFromBlocks(tasks: StudyTask[], blocks: ScheduleBlock[], plannerNow?: Date) {
+  const scheduledIds = new Set(blocks.flatMap((block) => (block.task_id ? [block.task_id] : [])));
+  const scheduledTitles = new Set(blocks.map((block) => block.title.trim().toLowerCase()));
+
+  return activeStudyTasks(tasks, plannerNow).filter(
+    (task) => !(task.id && scheduledIds.has(task.id)) && !scheduledTitles.has(task.title.trim().toLowerCase())
+  );
+}
+
+function scheduleSummary(tasks: StudyTask[], blocks: ScheduleBlock[], plannerNow: Date) {
+  const activeTasks = activeStudyTasks(tasks, plannerNow);
+  const queuedCount = tasksMissingFromBlocks(activeTasks, blocks, plannerNow).length;
+  return `Placed ${blocks.length} of ${activeTasks.length} tasks on the next 24-hour curve${queuedCount > 0 ? `; ${queuedCount} remain queued for a later pass.` : "."}`;
 }
 
 async function api<T>(path: string, token: string, init?: RequestInit, timeoutMs = DEFAULT_API_TIMEOUT_MS): Promise<T> {
@@ -220,6 +290,8 @@ export default function Home() {
   const [agentRunning, setAgentRunning] = useState(false);
   const [taskGenerating, setTaskGenerating] = useState(false);
   const [deviceNow, setDeviceNow] = useState(() => new Date(INITIAL_PLANNER_START));
+  const [demoClockAnchor, setDemoClockAnchor] = useState<DemoClockAnchor | null>(null);
+  const [demoTimeInput, setDemoTimeInput] = useState("2026-06-01T12:00");
   const [googleConnected, setGoogleConnected] = useState(false);
   const [googleNeedsReconnect, setGoogleNeedsReconnect] = useState(false);
   const [googleEmail, setGoogleEmail] = useState<string | null>(null);
@@ -237,6 +309,7 @@ export default function Home() {
   const [taskDifficulty, setTaskDifficulty] = useState<"low" | "medium" | "high">("high");
   const [editingSleepId, setEditingSleepId] = useState<string | null>(null);
   const [editingCaffeineId, setEditingCaffeineId] = useState<string | null>(null);
+  const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
 
   const curve = useMemo(
     () =>
@@ -255,10 +328,21 @@ export default function Home() {
     () =>
       [...sleepLogs]
         .filter(validSleepLog)
+        .filter((log) => new Date(log.sleep_end).getTime() <= plannerStart.getTime())
         .sort((a, b) => new Date(b.sleep_end).getTime() - new Date(a.sleep_end).getTime())[0],
-    [sleepLogs]
+    [sleepLogs, plannerStart]
   );
-  const visibleBlocks = useMemo(() => dedupeScheduleBlocks(blocks), [blocks]);
+  const planningTasks = useMemo(() => tasksBeforePlannerNow(tasks, blocks, plannerStart), [tasks, blocks, plannerStart]);
+  const visibleBlocks = useMemo(() => {
+    const windowEnd = plannerStart.getTime() + 24 * 60 * 60 * 1000;
+    return dedupeScheduleBlocks(blocks).filter(
+      (block) => new Date(block.end_at).getTime() > plannerStart.getTime() && new Date(block.start_at).getTime() < windowEnd
+    );
+  }, [blocks, plannerStart]);
+  const queuedTasks = useMemo(
+    () => (visibleBlocks.length > 0 ? tasksMissingFromBlocks(planningTasks, visibleBlocks, plannerStart) : []),
+    [planningTasks, visibleBlocks, plannerStart]
+  );
   const caffeinePreview = useMemo(
     () =>
       estimateCaffeineSleepForecast({
@@ -269,16 +353,18 @@ export default function Home() {
   );
 
   useEffect(() => {
-    const clock = window.setInterval(() => setDeviceNow(new Date()), 1000);
-
     async function bootstrap() {
       const now = new Date();
+      const savedDemoClock = readDemoClockAnchor();
+      const nextPlannerNow = plannerNowFromAnchor(now, savedDemoClock);
       setMounted(true);
       setDeviceNow(now);
-      setPlannerStart(now);
-      setSleepStart(toLocalInput(new Date(now.getTime() - 8 * 60 * 60 * 1000)));
-      setSleepEnd(toLocalInput(now));
-      setCaffeineTime(toLocalInput(now));
+      setDemoClockAnchor(savedDemoClock);
+      setPlannerStart(nextPlannerNow);
+      setDemoTimeInput(toLocalInput(nextPlannerNow));
+      setSleepStart(toLocalInput(new Date(nextPlannerNow.getTime() - 8 * 60 * 60 * 1000)));
+      setSleepEnd(toLocalInput(nextPlannerNow));
+      setCaffeineTime(toLocalInput(nextPlannerNow));
 
       const params = new URLSearchParams(window.location.search);
       if (params.get("google") === "connected") {
@@ -351,8 +437,50 @@ export default function Home() {
     }
 
     bootstrap();
-    return () => window.clearInterval(clock);
   }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
+
+    const updateClock = () => {
+      const nextDeviceNow = new Date();
+      setDeviceNow(nextDeviceNow);
+      setPlannerStart(plannerNowFromAnchor(nextDeviceNow, demoClockAnchor));
+    };
+    updateClock();
+    const clock = window.setInterval(updateClock, 1000);
+    return () => window.clearInterval(clock);
+  }, [demoClockAnchor, mounted]);
+
+  function saveDemoClock() {
+    const nextPlannerNow = new Date(demoTimeInput);
+    if (!demoTimeInput || Number.isNaN(nextPlannerNow.getTime())) {
+      setNotice({ type: "bad", message: "Choose a valid date and time for the demo clock." });
+      return;
+    }
+
+    const nextDeviceNow = new Date();
+    const anchor = { plannerAt: nextPlannerNow.toISOString(), deviceAt: nextDeviceNow.toISOString() };
+    window.localStorage.setItem(DEMO_CLOCK_STORAGE_KEY, JSON.stringify(anchor));
+    setDemoClockAnchor(anchor);
+    setPlannerStart(nextPlannerNow);
+    setSleepStart(toLocalInput(new Date(nextPlannerNow.getTime() - 8 * 60 * 60 * 1000)));
+    setSleepEnd(toLocalInput(nextPlannerNow));
+    setCaffeineTime(toLocalInput(nextPlannerNow));
+    setNotice({ type: "good", message: `Demo clock started at ${displayDate(nextPlannerNow)}. It will continue advancing at normal speed.` });
+  }
+
+  function resetDemoClock() {
+    const now = new Date();
+    window.localStorage.removeItem(DEMO_CLOCK_STORAGE_KEY);
+    setDemoClockAnchor(null);
+    setPlannerStart(now);
+    setDemoTimeInput(toLocalInput(now));
+    setSleepStart(toLocalInput(new Date(now.getTime() - 8 * 60 * 60 * 1000)));
+    setSleepEnd(toLocalInput(now));
+    setCaffeineTime(toLocalInput(now));
+    setNotice({ type: "neutral", message: "Demo clock cleared. Planner time now matches the device clock." });
+  }
 
   async function saveChronotype(next: Chronotype) {
     setChronotype(next);
@@ -472,28 +600,6 @@ export default function Home() {
     }
   }
 
-  async function addDemoTasks() {
-    const demoTasks: StudyTask[] = [
-      { id: crypto.randomUUID(), title: "Biology active recall", difficulty: "high", estimated_minutes: 75, status: "unscheduled", source: "manual" },
-      { id: crypto.randomUUID(), title: "Calculus practice set", difficulty: "medium", estimated_minutes: 60, status: "unscheduled", source: "manual" },
-      { id: crypto.randomUUID(), title: "History flashcard review", difficulty: "low", estimated_minutes: 35, status: "unscheduled", source: "manual" }
-    ];
-    setTasks((current) => [...demoTasks, ...current]);
-    setNotice({ type: "good", message: "Three demo study tasks added. AI scheduling is ready." });
-
-    if (!token) return;
-    await Promise.all(
-      demoTasks.map(async ({ id, ...payload }) => {
-        try {
-          const result = await api<{ task: StudyTask }>("/api/tasks", token, { method: "POST", body: JSON.stringify(payload) });
-          setTasks((current) => current.map((task) => (task.id === id ? result.task : task)));
-        } catch {
-          // The optimistic demo tasks remain available for a local scheduling demo.
-        }
-      })
-    );
-  }
-
   async function generateCalendarTasks() {
     if (!googleConnected) {
       setNotice({
@@ -517,7 +623,10 @@ export default function Home() {
         token,
         {
           method: "POST",
-          body: JSON.stringify({ timezone: Intl.DateTimeFormat().resolvedOptions().timeZone })
+          body: JSON.stringify({
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            startIso: plannerStart.toISOString()
+          })
         },
         AGENT_TIMEOUT_MS
       );
@@ -600,20 +709,22 @@ export default function Home() {
   }
 
   async function runAgent() {
-    if (tasks.length === 0) {
+    if (planningTasks.length === 0) {
       setNotice({ type: "neutral", message: "Add at least one task first. The agent needs study work to place on your capacity curve." });
       return;
     }
     if (!googleConnected) {
       const { localSchedule } = await import("@/lib/cognitive-model");
-      setBlocks(localSchedule(tasks, curve, plannerStart));
-      setNotice({ type: "neutral", message: "Connect Google Calendar to schedule around real events. A local curve-based schedule was created for now." });
+      const nextBlocks = dedupeScheduleBlocks(localSchedule(planningTasks, curve, plannerStart));
+      setBlocks(nextBlocks);
+      setNotice({ type: "neutral", message: `Connect Google Calendar to schedule around real events. A local curve-based schedule was created for now. ${scheduleSummary(planningTasks, nextBlocks, plannerStart)}` });
       return;
     }
     if (!token) {
       const { localSchedule } = await import("@/lib/cognitive-model");
-      setBlocks(localSchedule(tasks, curve, plannerStart));
-      setNotice({ type: "neutral", message: "Local demo schedule created. Connect Supabase + Google OAuth for real calendar-aware AI scheduling." });
+      const nextBlocks = dedupeScheduleBlocks(localSchedule(planningTasks, curve, plannerStart));
+      setBlocks(nextBlocks);
+      setNotice({ type: "neutral", message: `Local demo schedule created. Connect Supabase + Google OAuth for real calendar-aware AI scheduling. ${scheduleSummary(planningTasks, nextBlocks, plannerStart)}` });
       return;
     }
     setAgentRunning(true);
@@ -625,7 +736,7 @@ export default function Home() {
         {
           method: "POST",
           body: JSON.stringify({
-            tasks: tasks.filter((task) => task.status !== "completed"),
+            tasks: planningTasks,
             curve,
             startIso: plannerStart.toISOString(),
             timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -633,14 +744,16 @@ export default function Home() {
         },
         AGENT_TIMEOUT_MS
       );
-      setBlocks(dedupeScheduleBlocks(result.blocks));
-      setNotice({ type: result.source === "openai-mcp" ? "good" : "neutral", message: result.explanation });
+      const nextBlocks = dedupeScheduleBlocks(result.blocks);
+      setBlocks(nextBlocks);
+      setNotice({ type: result.source === "openai-mcp" ? "good" : "neutral", message: `${result.explanation} ${scheduleSummary(planningTasks, nextBlocks, plannerStart)}` });
     } catch (error) {
       const { localSchedule } = await import("@/lib/cognitive-model");
-      setBlocks(localSchedule(tasks, curve, plannerStart));
+      const nextBlocks = dedupeScheduleBlocks(localSchedule(planningTasks, curve, plannerStart));
+      setBlocks(nextBlocks);
       setNotice({
         type: "bad",
-        message: `${error instanceof Error ? error.message : "Agent scheduling failed."} A local curve-based schedule was created instead.`
+        message: `${error instanceof Error ? error.message : "Agent scheduling failed."} A local curve-based schedule was created instead. ${scheduleSummary(planningTasks, nextBlocks, plannerStart)}`
       });
     } finally {
       setAgentRunning(false);
@@ -684,6 +797,12 @@ export default function Home() {
           <strong className="clockValue">{displayClock(deviceNow)}</strong>
           <small>{displayDay(deviceNow)}</small>
         </div>
+        <div className={`metricPanel ${demoClockAnchor ? "demoMetric" : ""}`}>
+          <CalendarClock size={22} />
+          <span>Planner now</span>
+          <strong className="clockValue">{displayClock(plannerStart)}</strong>
+          <small>{displayDay(plannerStart)}{demoClockAnchor ? " · Demo" : ""}</small>
+        </div>
         <div className="metricPanel">
           <Brain size={22} />
           <span>Right now</span>
@@ -696,8 +815,8 @@ export default function Home() {
         </div>
         <div className="metricPanel">
           <TimerReset size={22} />
-          <span>Saved tasks</span>
-          <strong>{tasks.length}</strong>
+          <span>Active tasks</span>
+          <strong>{planningTasks.length}</strong>
         </div>
       </section>
 
@@ -705,10 +824,16 @@ export default function Home() {
         <div className="mainColumn">
           <div className="sectionHeader">
             <div>
-              <h2>Capacity Curve</h2>
-              <p className="sectionHint">{tasks.length === 0 ? "Add a task to unlock AI scheduling." : `${tasks.length} task${tasks.length === 1 ? "" : "s"} ready for placement.`}</p>
+              <h2>Next 24h Capacity Curve</h2>
+              <p className="sectionHint">
+                {planningTasks.length === 0
+                  ? "Add a task to unlock AI scheduling."
+                  : visibleBlocks.length > 0
+                    ? `${visibleBlocks.length} placed on this curve · ${queuedTasks.length} queued for later.`
+                    : `${planningTasks.length} task${planningTasks.length === 1 ? "" : "s"} ready for placement in the next 24 hours.`}
+              </p>
             </div>
-            <button className="primaryButton" onClick={runAgent} disabled={agentRunning || loading} title={tasks.length === 0 ? "Add at least one task first" : "Schedule tasks around calendar conflicts"}>
+            <button className="primaryButton" onClick={runAgent} disabled={agentRunning || loading} title={planningTasks.length === 0 ? "Add at least one active task first" : "Schedule tasks around calendar conflicts"}>
               {agentRunning ? <Loader2 className="spin" size={18} /> : <Sparkles size={18} />}
               Schedule with AI
             </button>
@@ -733,9 +858,50 @@ export default function Home() {
               ))
             )}
           </div>
+
+          {queuedTasks.length > 0 && (
+            <section className="queuedTasks">
+              <div className="queuedHeader">
+                <h3>Queued for a later pass</h3>
+                <span>{queuedTasks.length}</span>
+              </div>
+              <p className="queuedHint">Saved tasks outside the current 24-hour placement window.</p>
+              <div className="queuedList">
+                {queuedTasks.map((task) => (
+                  <article key={task.id ?? task.title}>
+                    <strong>{task.title}</strong>
+                    <span>{task.due_at ? `Due ${displayDate(task.due_at)}` : `${task.estimated_minutes} min`}</span>
+                  </article>
+                ))}
+              </div>
+            </section>
+          )}
         </div>
 
         <aside className="sideColumn">
+          <section className={`panel demoClockPanel ${demoClockAnchor ? "active" : ""}`}>
+            <div className="panelTitleRow">
+              <h2><CalendarClock size={18} /> Demo clock</h2>
+              {demoClockAnchor && <span className="demoBadge">Running</span>}
+            </div>
+            <label>
+              Planner date and time
+              <input type="datetime-local" value={demoTimeInput} onChange={(event) => setDemoTimeInput(event.target.value)} />
+            </label>
+            <div className="demoClockActions">
+              <button className="secondaryButton" onClick={saveDemoClock}>
+                <CalendarClock size={16} />
+                Set demo time
+              </button>
+              {demoClockAnchor && (
+                <button className="iconButton" title="Reset to device time" aria-label="Reset to device time" onClick={resetDemoClock}>
+                  <RotateCcw size={16} />
+                </button>
+              )}
+            </div>
+            <p className="panelHint">Continues at normal speed after setting.</p>
+          </section>
+
           <section className="panel">
             <h2>Chronotype</h2>
             <div className="segmented">
@@ -865,40 +1031,77 @@ export default function Home() {
 
           <section className="panel">
             <div className="panelTitleRow">
-              <h2>Tasks</h2>
-              <button className="textButton" onClick={addDemoTasks}>Add demo tasks</button>
+              <h2>Tasks <span className="countBadge">{planningTasks.length}</span></h2>
             </div>
-            <button className="secondaryButton full calendarTaskButton" onClick={generateCalendarTasks} disabled={taskGenerating}>
-              {taskGenerating ? <Loader2 className="spin" size={17} /> : <CalendarPlus size={17} />}
-              Generate from calendar
-            </button>
-            <input placeholder="AP Bio chapter review" value={taskTitle} onChange={(event) => setTaskTitle(event.target.value)} />
-            <div className="twoCols">
-              <select value={taskDifficulty} onChange={(event) => setTaskDifficulty(event.target.value as typeof taskDifficulty)}>
-                <option value="high">Hard</option>
-                <option value="medium">Medium</option>
-                <option value="low">Light</option>
-              </select>
-              <input type="number" value={taskMinutes} onChange={(event) => setTaskMinutes(Number(event.target.value))} />
+            <div className="taskAutomation">
+              <span className="miniLabel"><CalendarCheck size={14} /> Calendar agent</span>
+              <button className="secondaryButton full calendarTaskButton" onClick={generateCalendarTasks} disabled={taskGenerating}>
+                {taskGenerating ? <Loader2 className="spin" size={17} /> : <CalendarPlus size={17} />}
+                Generate from calendar
+              </button>
             </div>
-            <button className="primaryButton full" onClick={addTask}>
-              <Plus size={17} />
-              Add task
-            </button>
+            <div className="taskComposer">
+              <span className="miniLabel">Manual task</span>
+              <input placeholder="AP Bio chapter review" value={taskTitle} onChange={(event) => setTaskTitle(event.target.value)} />
+              <div className="twoCols">
+                <select value={taskDifficulty} onChange={(event) => setTaskDifficulty(event.target.value as typeof taskDifficulty)}>
+                  <option value="high">Hard</option>
+                  <option value="medium">Medium</option>
+                  <option value="low">Light</option>
+                </select>
+                <input type="number" value={taskMinutes} onChange={(event) => setTaskMinutes(Number(event.target.value))} />
+              </div>
+              <button className="primaryButton full" onClick={addTask}>
+                <Plus size={17} />
+                Add task
+              </button>
+            </div>
             <div className="taskList">
-              {tasks.map((task) => (
-                <article key={task.id ?? task.title}>
-                  <div>
-                    <strong>{task.title}</strong>
-                    <span>
-                      {task.estimated_minutes} min · {recommendedBandForTask(task)}
-                    </span>
-                  </div>
-                  <button className="iconButton danger" title="Delete task" aria-label="Delete task" onClick={() => deleteTask(task)}>
-                    <Trash2 size={15} />
-                  </button>
-                </article>
-              ))}
+              {planningTasks.length === 0 ? (
+                <p className="panelHint">No active tasks at the current planner time.</p>
+              ) : planningTasks.map((task) => {
+                const provenance = decodeCalendarTaskProvenance(task.description);
+                const taskKey = task.id ?? task.title;
+                const expanded = expandedTaskId === taskKey;
+                return (
+                  <article className={`taskItem ${provenance ? "aiTask" : ""}`} key={taskKey}>
+                    <div className="taskMain">
+                      <div>
+                        <strong>{task.title}</strong>
+                        <span>
+                          {task.estimated_minutes} min · {recommendedBandForTask(task)}
+                        </span>
+                        {task.due_at && <span>Due {displayDate(task.due_at)}</span>}
+                      </div>
+                      <div className="itemActions">
+                        {provenance && (
+                          <button
+                            className="iconButton sourceButton"
+                            title={expanded ? "Hide calendar source" : "View calendar source"}
+                            aria-label={expanded ? "Hide calendar source" : "View calendar source"}
+                            onClick={() => setExpandedTaskId(expanded ? null : taskKey)}
+                          >
+                            {expanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                          </button>
+                        )}
+                        <button className="iconButton danger" title="Delete task" aria-label="Delete task" onClick={() => deleteTask(task)}>
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    </div>
+                    {provenance && (
+                      <span className="sourceBadge"><CalendarCheck size={12} /> Calendar source</span>
+                    )}
+                    {provenance && expanded && (
+                      <div className="taskSourceDetails">
+                        <strong>{provenance.calendarEventTitle}</strong>
+                        {provenance.calendarEventAt && <span>{displayDate(provenance.calendarEventAt)}</span>}
+                        <p>{provenance.reason}</p>
+                      </div>
+                    )}
+                  </article>
+                );
+              })}
             </div>
           </section>
         </aside>

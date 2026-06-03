@@ -1,5 +1,6 @@
 import type { CapacityPoint, StudyTask } from "@/lib/types";
 import { localSchedule } from "@/lib/cognitive-model";
+import type { GoogleCalendarEvent } from "@/lib/google-oauth";
 
 type AgentScheduleInput = {
   googleAccessToken: string;
@@ -10,9 +11,9 @@ type AgentScheduleInput = {
 };
 
 type CalendarTaskGenerationInput = {
-  googleAccessToken: string;
   timezone: string;
   existingTasks: StudyTask[];
+  calendarEvents: GoogleCalendarEvent[];
 };
 
 function extractJson(text: string) {
@@ -79,7 +80,7 @@ export async function runSchedulingAgent(input: AgentScheduleInput) {
         {
           role: "system",
           content:
-            "You are a cognitive capacity scheduling agent. Use Google Calendar through the MCP connector to inspect existing events. Choose non-conflicting study blocks that match hard tasks to high capacity scores, medium tasks to good scores, and low tasks to lower/review windows. Return only JSON."
+            "You are a cognitive capacity scheduling agent. Use the supplied startIso as the planning clock, even when it differs from the real wall-clock time. Use Google Calendar through the MCP connector to inspect availability and existing events in the 24 hours after startIso before placing any task. Treat every non-transparent calendar event as a hard busy block, including school hours, classes, tutoring, meetings, interviews, appointments, clubs, meals, and travel. Never overlap a generated study block with a busy calendar event or another study block. Attempt to place every supplied incomplete task within the next 24 hours when a conflict-free slot exists, prioritizing earlier deadlines. Choose slots that match hard tasks to high capacity scores, medium tasks to good scores, and low tasks to lower/review windows. If a task cannot fit, omit it from blocks so the app can queue it for a later planning pass. Return only JSON."
         },
         {
           role: "user",
@@ -164,14 +165,15 @@ export async function runCalendarTaskGenerationAgent(input: CalendarTaskGenerati
         {
           role: "system",
           content:
-            "You are a study planning assistant. Inspect Google Calendar for the next 14 days. Infer useful preparation tasks only from study, class, exam, assessment, assignment, project, and deadline events. Do not create or modify calendar events. Avoid duplicates and return only JSON."
+            "You are a study planning assistant. Use the supplied Google Calendar events, which were already filtered to academic sources. Infer useful preparation tasks from those events only. Do not create or modify calendar events. Avoid duplicates and return only JSON."
         },
         {
           role: "user",
           content: JSON.stringify({
             task:
-              "Generate up to 6 actionable study tasks based on relevant upcoming calendar events. Use concise titles. Estimate realistic minutes and difficulty. Set due_at before the related event when possible. Return an empty array when no relevant events exist.",
+              "Generate one actionable preparation task for each supplied academic calendar event, up to 6 tasks. Use concise titles. Estimate realistic minutes and difficulty. Set due_at before the related event when possible. For every task, preserve the exact source calendar event title, event start time, and event id. Return an empty array only when the supplied calendarEvents array is empty.",
             timezone: input.timezone,
+            calendarEvents: input.calendarEvents,
             existingTasks: input.existingTasks.map((task) => ({
               title: task.title,
               due_at: task.due_at ?? null
@@ -184,20 +186,14 @@ export async function runCalendarTaskGenerationAgent(input: CalendarTaskGenerati
                   description: "why this preparation task was inferred",
                   difficulty: "low | medium | high",
                   estimated_minutes: 60,
-                  due_at: "ISO datetime or null"
+                  due_at: "ISO datetime or null",
+                  source_event_title: "exact Google Calendar event title",
+                  source_event_at: "source event ISO datetime or null",
+                  source_event_id: "source Google Calendar event id or null"
                 }
               ]
             }
           })
-        }
-      ],
-      tools: [
-        {
-          type: "mcp",
-          server_label: "google_calendar",
-          connector_id: "connector_googlecalendar",
-          authorization: input.googleAccessToken,
-          require_approval: "never"
         }
       ]
     })
@@ -209,11 +205,34 @@ export async function runCalendarTaskGenerationAgent(input: CalendarTaskGenerati
   }
 
   const data = await response.json();
-  const parsed = extractJson(responseOutputText(data) || "{}");
+  let parsed: { explanation?: string; tasks?: unknown[] };
+  try {
+    parsed = extractJson(responseOutputText(data) || "{}");
+  } catch {
+    parsed = {};
+  }
+
+  const generatedTasks = Array.isArray(parsed.tasks) ? parsed.tasks : [];
+  if (generatedTasks.length === 0 && input.calendarEvents.length > 0) {
+    return {
+      source: "calendar-fallback",
+      explanation: "Academic calendar events were found. Preparation tasks were generated with the calendar fallback.",
+      tasks: input.calendarEvents.slice(0, 6).map((event) => ({
+        title: `Prepare for ${event.title.replace("[Planner Demo] ", "")}`,
+        description: `Prepare for the upcoming calendar event: ${event.title}.`,
+        difficulty: "medium",
+        estimated_minutes: 60,
+        due_at: new Date(new Date(event.startAt).getTime() - 60 * 60 * 1000).toISOString(),
+        source_event_title: event.title,
+        source_event_at: event.startAt,
+        source_event_id: event.id
+      }))
+    };
+  }
 
   return {
-    source: "openai-mcp",
+    source: "openai-calendar",
     explanation: parsed.explanation ?? "Calendar review completed.",
-    tasks: Array.isArray(parsed.tasks) ? parsed.tasks : []
+    tasks: generatedTasks
   };
 }

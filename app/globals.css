@@ -7,7 +7,7 @@
   --teal: #0f766e;
   --blue: #2563eb;
   --rose: #be123c;
-  --amber: #b45309;
+  --task-accent: #7c3aed;
   --shadow: 0 18px 50px rgba(27, 39, 34, 0.08);
 }
 
@@ -37,7 +37,7 @@ button {
 }
 
 main {
-  width: min(1440px, 100%);
+  width: min(1480px, 100%);
   margin: 0 auto;
   padding: 28px;
 }
@@ -58,7 +58,9 @@ main {
 .topbar {
   justify-content: space-between;
   gap: 18px;
-  margin-bottom: 18px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 16px;
 }
 
 .eyebrow {
@@ -77,7 +79,7 @@ p {
 
 h1 {
   margin-bottom: 0;
-  font-size: clamp(2rem, 4vw, 4.5rem);
+  font-size: clamp(2rem, 4vw, 4.1rem);
   letter-spacing: 0;
   line-height: 0.98;
 }
@@ -155,7 +157,7 @@ h2 {
 
 .dashboard {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 12px;
   margin-bottom: 16px;
 }
@@ -167,7 +169,7 @@ h2 {
   border-radius: 8px;
   padding: 18px;
   background: var(--panel);
-  box-shadow: var(--shadow);
+  box-shadow: 0 10px 30px rgba(27, 39, 34, 0.06);
 }
 
 .metricPanel small {
@@ -192,6 +194,11 @@ h2 {
   font-size: 1.7rem;
 }
 
+.demoMetric {
+  border-color: #c4b5fd;
+  background: #faf8ff;
+}
+
 .workspace {
   align-items: flex-start;
   gap: 18px;
@@ -204,7 +211,7 @@ h2 {
   border-radius: 8px;
   padding: 18px;
   background: var(--panel);
-  box-shadow: var(--shadow);
+  box-shadow: 0 16px 42px rgba(27, 39, 34, 0.07);
 }
 
 .sideColumn {
@@ -254,7 +261,7 @@ h2 {
 }
 
 .blockLine {
-  stroke: var(--amber);
+  stroke: var(--task-accent);
   stroke-width: 2;
   stroke-dasharray: 5 5;
 }
@@ -266,7 +273,7 @@ h2 {
 }
 
 .blockDot {
-  fill: var(--amber);
+  fill: var(--task-accent);
 }
 
 .blockIndexLabel {
@@ -338,7 +345,7 @@ h2 {
 }
 
 .blockItem div,
-.taskList article div,
+.taskMain > div:first-child,
 .historyItem div:first-child {
   display: grid;
   gap: 3px;
@@ -416,9 +423,69 @@ h2 {
   place-items: center;
   border-radius: 999px;
   color: white;
-  background: var(--amber);
+  background: var(--task-accent);
   font-size: 0.75rem;
   font-weight: 800;
+}
+
+.blockItem .blockIndex {
+  color: white;
+}
+
+.queuedTasks {
+  margin-top: 18px;
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+
+.queuedHeader,
+.queuedList article {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.queuedHeader h3 {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.queuedHeader span {
+  display: grid;
+  min-width: 24px;
+  height: 24px;
+  place-items: center;
+  border-radius: 999px;
+  color: #5b21b6;
+  background: #ede9fe;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.queuedHint {
+  margin: 5px 0 8px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.queuedList {
+  display: grid;
+}
+
+.queuedList article {
+  border-bottom: 1px solid #edf1ed;
+  padding: 9px 0;
+}
+
+.queuedList strong {
+  font-size: 0.84rem;
+}
+
+.queuedList span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-align: right;
 }
 
 .panel {
@@ -426,7 +493,33 @@ h2 {
   border-radius: 8px;
   padding: 16px;
   background: var(--panel);
-  box-shadow: var(--shadow);
+  box-shadow: 0 12px 34px rgba(27, 39, 34, 0.06);
+}
+
+.demoClockPanel.active {
+  border-color: #c4b5fd;
+  background: #faf8ff;
+}
+
+.demoClockActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.demoClockActions .secondaryButton {
+  flex: 1;
+}
+
+.demoBadge {
+  margin-left: auto;
+  border-radius: 999px;
+  padding: 4px 8px;
+  color: #5b21b6;
+  background: #ede9fe;
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
 }
 
 .panel h2 {
@@ -438,7 +531,7 @@ h2 {
 .historyHeader,
 .historyItem,
 .itemActions,
-.taskList article {
+.taskMain {
   display: flex;
   align-items: center;
 }
@@ -446,7 +539,7 @@ h2 {
 .panelTitleRow,
 .historyHeader,
 .historyItem,
-.taskList article {
+.taskMain {
   justify-content: space-between;
   gap: 10px;
 }
@@ -457,6 +550,18 @@ h2 {
 
 .panelTitleRow h2 {
   margin: 0;
+}
+
+.countBadge {
+  display: inline-grid;
+  min-width: 22px;
+  height: 22px;
+  margin-left: 4px;
+  place-items: center;
+  border-radius: 999px;
+  color: #0f5f56;
+  background: #e6f7f3;
+  font-size: 0.72rem;
 }
 
 .historyHeader {
@@ -597,12 +702,12 @@ select {
   display: grid;
   gap: 8px;
   margin-top: 12px;
-  max-height: 230px;
+  max-height: 340px;
   overflow: auto;
 }
 
 .calendarTaskButton {
-  margin-bottom: 10px;
+  margin-top: 8px;
 }
 
 .taskList article {
@@ -610,6 +715,72 @@ select {
   border-radius: 8px;
   padding: 10px;
   background: #fbfcfa;
+}
+
+.taskAutomation,
+.taskComposer {
+  margin-bottom: 10px;
+  padding: 10px;
+  background: #f7faf8;
+}
+
+.taskAutomation {
+  border-left: 3px solid #5fb8aa;
+}
+
+.taskComposer {
+  border-left: 3px solid #cbd5d0;
+}
+
+.miniLabel,
+.sourceBadge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.taskItem.aiTask {
+  border-left: 3px solid #5fb8aa;
+}
+
+.sourceBadge {
+  width: fit-content;
+  margin-top: 8px;
+  border-radius: 999px;
+  padding: 3px 7px;
+  color: #0f5f56;
+  background: #e6f7f3;
+  text-transform: none;
+}
+
+.sourceButton {
+  color: #0f766e;
+  background: #f1fbf8;
+}
+
+.taskSourceDetails {
+  display: grid;
+  gap: 4px;
+  margin-top: 9px;
+  border-top: 1px solid var(--line);
+  padding-top: 9px;
+}
+
+.taskSourceDetails strong {
+  color: #0f5f56;
+  font-size: 0.82rem;
+}
+
+.taskSourceDetails span,
+.taskSourceDetails p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.45;
 }
 
 .spin {

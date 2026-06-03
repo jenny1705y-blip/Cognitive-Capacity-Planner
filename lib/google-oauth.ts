@@ -12,6 +12,14 @@ type GoogleTokenResponse = {
   id_token?: string;
 };
 
+export type GoogleCalendarEvent = {
+  id: string;
+  title: string;
+  description: string;
+  startAt: string;
+  endAt: string;
+};
+
 export function hasRequiredGoogleCalendarScopes(scope?: string | null) {
   const scopes = new Set((scope ?? "").split(" ").filter(Boolean));
   return scopes.has(GOOGLE_CALENDAR_EVENTS_SCOPE) && scopes.has(GOOGLE_CALENDAR_FREEBUSY_SCOPE);
@@ -132,4 +140,43 @@ export async function fetchGoogleProfile(accessToken: string) {
 
   if (!response.ok) return null;
   return (await response.json()) as { email?: string };
+}
+
+export async function fetchUpcomingGoogleEvents(accessToken: string, startAt: Date, endAt: Date) {
+  const params = new URLSearchParams({
+    timeMin: startAt.toISOString(),
+    timeMax: endAt.toISOString(),
+    singleEvents: "true",
+    orderBy: "startTime",
+    maxResults: "100"
+  });
+  const response = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events?${params}`, {
+    headers: { Authorization: `Bearer ${accessToken}` }
+  });
+
+  if (!response.ok) {
+    throw new Error(`Google Calendar event read failed: ${await response.text()}`);
+  }
+
+  const data = (await response.json()) as {
+    items?: Array<{
+      id?: string;
+      summary?: string;
+      description?: string;
+      start?: { dateTime?: string; date?: string };
+      end?: { dateTime?: string; date?: string };
+      status?: string;
+      transparency?: string;
+    }>;
+  };
+
+  return (data.items ?? [])
+    .filter((event) => event.id && event.summary && event.status !== "cancelled")
+    .map((event) => ({
+      id: event.id as string,
+      title: event.summary as string,
+      description: event.description ?? "",
+      startAt: event.start?.dateTime ?? event.start?.date ?? "",
+      endAt: event.end?.dateTime ?? event.end?.date ?? ""
+    }));
 }
