@@ -2,6 +2,7 @@ import { createAdminSupabase } from "@/lib/supabase-admin";
 
 const GOOGLE_CALENDAR_EVENTS_SCOPE = "https://www.googleapis.com/auth/calendar.events";
 const GOOGLE_CALENDAR_FREEBUSY_SCOPE = "https://www.googleapis.com/auth/calendar.freebusy";
+export const GOOGLE_RECONNECT_MESSAGE = "Google Calendar permission expired. Reconnect Google Calendar to continue.";
 
 type GoogleTokenResponse = {
   access_token: string;
@@ -114,7 +115,11 @@ export async function refreshGoogleAccessToken(userId: string) {
   });
 
   if (!response.ok) {
-    throw new Error(`Google token refresh failed: ${await response.text()}`);
+    const errorText = await response.text();
+    if (errorText.includes("invalid_grant")) {
+      throw new Error(GOOGLE_RECONNECT_MESSAGE);
+    }
+    throw new Error(`Google token refresh failed: ${errorText}`);
   }
 
   const refreshed = (await response.json()) as GoogleTokenResponse;

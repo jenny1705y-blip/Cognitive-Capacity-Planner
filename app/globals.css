@@ -63,6 +63,37 @@ main {
   padding-bottom: 16px;
 }
 
+.topbarActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.languageToggle {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px;
+  border-radius: 8px;
+  padding: 4px;
+  background: #edf1ed;
+}
+
+.languageToggle button {
+  min-width: 36px;
+  min-height: 34px;
+  border: 0;
+  border-radius: 7px;
+  color: var(--muted);
+  background: transparent;
+  font-weight: 800;
+}
+
+.languageToggle .active {
+  color: var(--ink);
+  background: white;
+  box-shadow: 0 4px 14px rgba(20, 28, 24, 0.08);
+}
+
 .eyebrow {
   margin: 0 0 6px;
   color: var(--teal);
@@ -632,10 +663,20 @@ h2 {
   color: var(--ink);
 }
 
+.iconButton.success:hover {
+  border-color: #99d8cb;
+  color: #0f5f56;
+  background: #ecfdf8;
+}
+
 .iconButton.danger:hover {
   border-color: #fecdd3;
   color: var(--rose);
   background: #fff1f2;
+}
+
+.elapsedTask {
+  background: #faf8ff;
 }
 
 .textButton {
@@ -802,6 +843,10 @@ select {
   .workspace {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .topbarActions {
+    justify-content: space-between;
   }
 
   .dashboard {

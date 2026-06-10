@@ -1,5 +1,5 @@
 import { getUserFromRequest, jsonError } from "@/lib/api";
-import { hasRequiredGoogleCalendarScopes } from "@/lib/google-oauth";
+import { hasRequiredGoogleCalendarScopes, refreshGoogleAccessToken } from "@/lib/google-oauth";
 import { createAdminSupabase } from "@/lib/supabase-admin";
 
 export async function GET(request: Request) {
@@ -17,10 +17,19 @@ export async function GET(request: Request) {
 
   const hasToken = Boolean(data?.refresh_token);
   const hasCalendarScopes = hasRequiredGoogleCalendarScopes(data?.scope);
+  let tokenRefreshable = hasToken && hasCalendarScopes;
+
+  if (tokenRefreshable) {
+    try {
+      await refreshGoogleAccessToken(user.id);
+    } catch {
+      tokenRefreshable = false;
+    }
+  }
 
   return Response.json({
-    connected: hasToken && hasCalendarScopes,
+    connected: tokenRefreshable,
     googleEmail: data?.google_email ?? null,
-    needsReconnect: hasToken && !hasCalendarScopes
+    needsReconnect: hasToken && !tokenRefreshable
   });
 }
