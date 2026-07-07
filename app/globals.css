@@ -238,6 +238,11 @@ h2 {
 .mainColumn {
   flex: 1;
   min-width: 0;
+  position: sticky;
+  top: 18px;
+  max-height: calc(100vh - 36px);
+  overflow-y: auto;
+  scrollbar-gutter: stable;
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 18px;
@@ -249,6 +254,11 @@ h2 {
   width: 380px;
   display: grid;
   gap: 14px;
+  max-height: calc(100vh - 36px);
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
 }
 
 .sectionHeader {
@@ -855,6 +865,15 @@ select {
 
   .sideColumn {
     width: 100%;
+    max-height: none;
+    overflow: visible;
+    padding-right: 0;
+  }
+
+  .mainColumn {
+    position: static;
+    max-height: none;
+    overflow: visible;
   }
 }
 
