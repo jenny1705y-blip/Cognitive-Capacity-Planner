@@ -267,6 +267,17 @@ h2 {
   margin-bottom: 8px;
 }
 
+.curveActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.viewToggle {
+  width: 176px;
+  grid-template-columns: repeat(2, 1fr);
+}
+
 .sectionHeader h2,
 .panel h2 {
   margin-bottom: 0;
@@ -768,6 +779,24 @@ select {
   background: #fbfcfa;
 }
 
+.taskTitleRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.carryBadge {
+  width: fit-content;
+  border-radius: 999px;
+  padding: 3px 7px;
+  color: #4c1d95;
+  background: #ede9fe;
+  font-size: 0.72rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
 .taskAutomation,
 .taskComposer {
   margin-bottom: 10px;
@@ -881,6 +910,15 @@ select {
   .sectionHeader {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .curveActions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .viewToggle {
+    width: 100%;
   }
 
   .metricPanel strong {

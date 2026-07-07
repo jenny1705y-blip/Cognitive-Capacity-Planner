@@ -42,6 +42,7 @@ create table if not exists public.tasks (
     check (status in ('unscheduled', 'scheduled', 'completed', 'archived')),
   source text not null default 'manual'
     check (source in ('manual', 'google_calendar', 'ai')),
+  carried_over_count integer not null default 0 check (carried_over_count >= 0),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

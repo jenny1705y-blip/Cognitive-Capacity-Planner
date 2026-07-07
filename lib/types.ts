@@ -25,6 +25,7 @@ export type StudyTask = {
   due_at?: string | null;
   status?: "unscheduled" | "scheduled" | "completed" | "archived";
   source?: "manual" | "google_calendar" | "ai";
+  carried_over_count?: number;
 };
 
 export type CapacityPoint = {

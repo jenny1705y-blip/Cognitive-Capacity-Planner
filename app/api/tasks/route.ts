@@ -38,7 +38,7 @@ export async function PATCH(request: Request) {
   if (error || !user || !token) return jsonError(error ?? "Unauthorized", 401);
 
   const body = await request.json();
-  const { id, title, description, difficulty, estimated_minutes, due_at, status, source } = body;
+  const { id, title, description, difficulty, estimated_minutes, due_at, status, source, carried_over_count } = body;
   if (!id) return jsonError("Missing task id.", 400);
 
   const updates: Record<string, unknown> = {};
@@ -49,6 +49,7 @@ export async function PATCH(request: Request) {
   if (typeof due_at === "string" || due_at === null) updates.due_at = due_at;
   if (status === "unscheduled" || status === "scheduled" || status === "completed" || status === "archived") updates.status = status;
   if (source === "manual" || source === "google_calendar" || source === "ai") updates.source = source;
+  if (typeof carried_over_count === "number") updates.carried_over_count = Math.max(0, Math.round(carried_over_count));
 
   if (Object.keys(updates).length === 0) return jsonError("No supported task fields to update.", 400);
 

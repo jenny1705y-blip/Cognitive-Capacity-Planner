@@ -33,10 +33,12 @@ const INITIAL_PLANNER_START = "2026-05-10T12:00:00.000Z";
 const STARTUP_TIMEOUT_MS = 4000;
 const DEFAULT_API_TIMEOUT_MS = 8000;
 const AGENT_TIMEOUT_MS = 60000;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const DEMO_CLOCK_STORAGE_KEY = "cognitive-capacity-planner-demo-clock";
 const LANGUAGE_STORAGE_KEY = "cognitive-capacity-planner-language";
 
 type Language = "en" | "ko";
+type ViewDate = "today" | "tomorrow";
 
 type DemoClockAnchor = {
   plannerAt: string;
@@ -57,6 +59,10 @@ const copy = {
     activeTasks: "Active tasks",
     demo: "Demo",
     curveTitle: "Next 24h Capacity Curve",
+    curveTitleToday: "Today's 24h Capacity Curve",
+    curveTitleTomorrow: "Tomorrow's 24h Capacity Forecast",
+    today: "Today",
+    tomorrow: "Tomorrow",
     addTaskToUnlock: "Add a task to unlock AI scheduling.",
     scheduleWithAi: "Schedule with AI",
     noAiBlocks: "No AI blocks yet. Add tasks, connect Google Calendar, then run the scheduler.",
@@ -139,6 +145,10 @@ const copy = {
     activeTasks: "활성 과제",
     demo: "데모",
     curveTitle: "다음 24시간 역량 곡선",
+    curveTitleToday: "오늘 24시간 역량 곡선",
+    curveTitleTomorrow: "내일 24시간 예상 역량 곡선",
+    today: "오늘",
+    tomorrow: "내일",
     addTaskToUnlock: "AI 스케줄링을 시작하려면 과제를 추가하세요.",
     scheduleWithAi: "AI로 배치",
     noAiBlocks: "아직 AI 블록이 없습니다. 과제를 추가하고 Google Calendar를 연결한 뒤 스케줄러를 실행하세요.",
@@ -234,6 +244,10 @@ function displayClock(date: Date, language: Language = "en") {
 
 function displayDay(date: Date, language: Language = "en") {
   return date.toLocaleDateString(language === "ko" ? "ko-KR" : undefined, { weekday: "short", month: "short", day: "numeric" });
+}
+
+function carriedOverLabel(count: number, language: Language = "en") {
+  return language === "ko" ? `이월됨(${count}회)` : `Carried over (${count})`;
 }
 
 function sleepDurationHours(log: SleepLog) {
@@ -362,6 +376,14 @@ function isGoogleReconnectError(error: unknown) {
     message.includes("Google Calendar permission expired") ||
     message.includes("invalid_grant") ||
     message.includes("Token has been expired or revoked")
+  );
+}
+
+function isStaleSupabaseSessionError(message: string) {
+  return (
+    message.includes("User from sub claim in JWT does not exist") ||
+    message.includes("Invalid Refresh Token") ||
+    message.includes("Refresh Token Not Found")
   );
 }
 
@@ -525,9 +547,15 @@ export default function Home() {
   const [editingSleepId, setEditingSleepId] = useState<string | null>(null);
   const [editingCaffeineId, setEditingCaffeineId] = useState<string | null>(null);
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
+  const [viewDate, setViewDate] = useState<ViewDate>("today");
   const labels = copy[language];
 
-  const curve = useMemo(
+  const viewStart = useMemo(
+    () => (viewDate === "today" ? plannerStart : new Date(plannerStart.getTime() + MS_PER_DAY)),
+    [plannerStart, viewDate]
+  );
+  const curveTitle = viewDate === "today" ? labels.curveTitleToday : labels.curveTitleTomorrow;
+  const todayCurve = useMemo(
     () =>
       buildCapacityCurve({
         start: plannerStart,
@@ -536,6 +564,18 @@ export default function Home() {
         chronotype
       }),
     [plannerStart, sleepLogs, caffeineLogs, chronotype]
+  );
+  const curve = useMemo(
+    () =>
+      viewDate === "today"
+        ? todayCurve
+        : buildCapacityCurve({
+            start: viewStart,
+            sleepLogs,
+            caffeineLogs,
+            chronotype
+          }),
+    [viewDate, todayCurve, viewStart, sleepLogs, caffeineLogs, chronotype]
   );
 
   const peak = useMemo(() => curve.reduce((best, point) => (point.score > best.score ? point : best), curve[0]), [curve]);
@@ -551,11 +591,11 @@ export default function Home() {
   const planningTasks = useMemo(() => tasksBeforePlannerNow(tasks, blocks, plannerStart), [tasks, blocks, plannerStart]);
   const elapsedTasks = useMemo(() => elapsedStudyTasks(tasks, blocks, plannerStart), [tasks, blocks, plannerStart]);
   const visibleBlocks = useMemo(() => {
-    const windowEnd = plannerStart.getTime() + 24 * 60 * 60 * 1000;
+    const windowEnd = viewStart.getTime() + MS_PER_DAY;
     return dedupeScheduleBlocks(blocks).filter(
-      (block) => new Date(block.end_at).getTime() > plannerStart.getTime() && new Date(block.start_at).getTime() < windowEnd
+      (block) => new Date(block.end_at).getTime() > viewStart.getTime() && new Date(block.start_at).getTime() < windowEnd
     );
-  }, [blocks, plannerStart]);
+  }, [blocks, viewStart]);
   const queuedTasks = useMemo(
     () => (visibleBlocks.length > 0 ? tasksMissingFromBlocks(planningTasks, visibleBlocks, plannerStart) : []),
     [planningTasks, visibleBlocks, plannerStart]
@@ -603,6 +643,18 @@ export default function Home() {
         const { data } = await withStartupTimeout(supabase.auth.getSession(), "Supabase session check timed out.");
         accessToken = data.session?.access_token ?? "";
 
+        if (accessToken) {
+          const { data: userData, error: userError } = await withStartupTimeout(
+            supabase.auth.getUser(accessToken),
+            "Supabase user validation timed out."
+          );
+          if (userError || !userData.user) {
+            authErrorMessage = userError?.message ?? "Stored Supabase session is no longer valid.";
+            await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
+            accessToken = "";
+          }
+        }
+
         if (!accessToken) {
           const signedIn = await withStartupTimeout(supabase.auth.signInAnonymously(), "Supabase anonymous sign-in timed out.");
           authErrorMessage = signedIn.error?.message ?? "";
@@ -649,7 +701,17 @@ export default function Home() {
           });
         }
       } catch (error) {
-        setNotice({ type: "bad", message: error instanceof Error ? error.message : "Could not load planner data." });
+        const message = error instanceof Error ? error.message : "Could not load planner data.";
+        if (isStaleSupabaseSessionError(message)) {
+          await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
+          setToken("");
+          setNotice({
+            type: "neutral",
+            message: "Supabase session was stale after project resume. I cleared it; refresh once to create a new anonymous session."
+          });
+        } else {
+          setNotice({ type: "bad", message });
+        }
       } finally {
         setLoading(false);
       }
@@ -940,9 +1002,13 @@ export default function Home() {
   }
 
   async function patchTask(task: StudyTask, patch: Partial<StudyTask>) {
-    if (!task.id) return;
-    setTasks((current) => current.map((item) => (item.id === task.id ? { ...item, ...patch } : item)));
-    if (!token) return;
+    if (!task.id) return false;
+    let previousTasks: StudyTask[] | null = null;
+    setTasks((current) => {
+      previousTasks = current;
+      return current.map((item) => (item.id === task.id ? { ...item, ...patch } : item));
+    });
+    if (!token) return true;
 
     try {
       const result = await api<{ task: StudyTask }>("/api/tasks", token, {
@@ -950,20 +1016,25 @@ export default function Home() {
         body: JSON.stringify({ id: task.id, ...patch })
       });
       setTasks((current) => current.map((item) => (item.id === task.id ? result.task : item)));
+      return true;
     } catch (error) {
+      if (previousTasks) setTasks(previousTasks);
       setNotice({ type: "bad", message: error instanceof Error ? error.message : "Could not update task." });
+      return false;
     }
   }
 
   async function markTaskDone(task: StudyTask) {
-    await patchTask(task, { status: "completed" });
+    const updated = await patchTask(task, { status: "completed" });
+    if (!updated) return;
     await clearScheduleBlocksForTask(task);
     setNotice({ type: "good", message: `Marked done: ${task.title}.` });
   }
 
   async function moveTaskToTomorrow(task: StudyTask) {
-    const nextDue = new Date(plannerStart.getTime() + 24 * 60 * 60 * 1000).toISOString();
-    await patchTask(task, { due_at: nextDue, status: "unscheduled" });
+    const nextCarryCount = (task.carried_over_count ?? 0) + 1;
+    const updated = await patchTask(task, { carried_over_count: nextCarryCount, status: "unscheduled" });
+    if (!updated) return;
     await clearScheduleBlocksForTask(task);
     setNotice({ type: "good", message: `Moved to tomorrow: ${task.title}.` });
   }
@@ -988,14 +1059,14 @@ export default function Home() {
     }
     if (!googleConnected) {
       const { localSchedule } = await import("@/lib/cognitive-model");
-      const nextBlocks = dedupeScheduleBlocks(localSchedule(planningTasks, curve, plannerStart));
+      const nextBlocks = dedupeScheduleBlocks(localSchedule(planningTasks, todayCurve, plannerStart));
       setBlocks(nextBlocks);
       setNotice({ type: "neutral", message: `${language === "ko" ? "Google Calendar를 연결하면 실제 일정 충돌을 피해서 배치할 수 있습니다. 지금은 로컬 곡선 기반 스케줄을 만들었습니다." : "Connect Google Calendar to schedule around real events. A local curve-based schedule was created for now."} ${scheduleSummary(planningTasks, nextBlocks, plannerStart, language)}` });
       return;
     }
     if (!token) {
       const { localSchedule } = await import("@/lib/cognitive-model");
-      const nextBlocks = dedupeScheduleBlocks(localSchedule(planningTasks, curve, plannerStart));
+      const nextBlocks = dedupeScheduleBlocks(localSchedule(planningTasks, todayCurve, plannerStart));
       setBlocks(nextBlocks);
       setNotice({ type: "neutral", message: `${language === "ko" ? "로컬 데모 스케줄을 만들었습니다. 실제 캘린더 기반 AI 배치에는 Supabase와 Google OAuth 연결이 필요합니다." : "Local demo schedule created. Connect Supabase + Google OAuth for real calendar-aware AI scheduling."} ${scheduleSummary(planningTasks, nextBlocks, plannerStart, language)}` });
       return;
@@ -1010,7 +1081,7 @@ export default function Home() {
           method: "POST",
           body: JSON.stringify({
             tasks: planningTasks,
-            curve,
+            curve: todayCurve,
             startIso: plannerStart.toISOString(),
             timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
           })
@@ -1022,7 +1093,7 @@ export default function Home() {
       setNotice({ type: result.source === "openai-mcp" ? "good" : "neutral", message: `${result.explanation} ${scheduleSummary(planningTasks, nextBlocks, plannerStart, language)}` });
     } catch (error) {
       const { localSchedule } = await import("@/lib/cognitive-model");
-      const nextBlocks = dedupeScheduleBlocks(localSchedule(planningTasks, curve, plannerStart));
+      const nextBlocks = dedupeScheduleBlocks(localSchedule(planningTasks, todayCurve, plannerStart));
       setBlocks(nextBlocks);
       if (isGoogleReconnectError(error)) {
         setGoogleConnected(false);
@@ -1127,7 +1198,7 @@ export default function Home() {
         <div className="mainColumn">
           <div className="sectionHeader">
             <div>
-              <h2>{labels.curveTitle}</h2>
+              <h2>{curveTitle}</h2>
               <p className="sectionHint">
                 {planningTasks.length === 0
                   ? labels.addTaskToUnlock
@@ -1140,12 +1211,21 @@ export default function Home() {
                       : `${planningTasks.length} task${planningTasks.length === 1 ? "" : "s"} ready for placement in the next 24 hours.`}
               </p>
             </div>
-            <button className="primaryButton" onClick={runAgent} disabled={agentRunning || loading} title={planningTasks.length === 0 ? "Add at least one active task first" : "Schedule tasks around calendar conflicts"}>
-              {agentRunning ? <Loader2 className="spin" size={18} /> : <Sparkles size={18} />}
-              {labels.scheduleWithAi}
-            </button>
+            <div className="curveActions">
+              <div className="segmented viewToggle" aria-label={language === "ko" ? "곡선 날짜 선택" : "Curve date view"}>
+                {(["today", "tomorrow"] as ViewDate[]).map((dateView) => (
+                  <button className={viewDate === dateView ? "active" : ""} key={dateView} onClick={() => setViewDate(dateView)}>
+                    {dateView === "today" ? labels.today : labels.tomorrow}
+                  </button>
+                ))}
+              </div>
+              <button className="primaryButton" onClick={runAgent} disabled={agentRunning || loading} title={planningTasks.length === 0 ? "Add at least one active task first" : "Schedule tasks around calendar conflicts"}>
+                {agentRunning ? <Loader2 className="spin" size={18} /> : <Sparkles size={18} />}
+                {labels.scheduleWithAi}
+              </button>
+            </div>
           </div>
-          <CapacityChart curve={curve} blocks={visibleBlocks} start={plannerStart} language={language} />
+          <CapacityChart curve={curve} blocks={visibleBlocks} start={viewStart} language={language} />
 
           <div className="timeline">
             {visibleBlocks.length === 0 ? (
@@ -1372,11 +1452,15 @@ export default function Home() {
                 const provenance = decodeCalendarTaskProvenance(task.description);
                 const taskKey = task.id ?? task.title;
                 const expanded = expandedTaskId === taskKey;
+                const carryCount = task.carried_over_count ?? 0;
                 return (
                   <article className={`taskItem ${provenance ? "aiTask" : ""}`} key={taskKey}>
                     <div className="taskMain">
                       <div>
-                        <strong>{task.title}</strong>
+                        <div className="taskTitleRow">
+                          <strong>{task.title}</strong>
+                          {carryCount > 0 && <span className="carryBadge">{carriedOverLabel(carryCount, language)}</span>}
+                        </div>
                         <span>
                           {task.estimated_minutes}{language === "ko" ? "분" : " min"} · {bandForTask(task, language)}
                         </span>
@@ -1393,6 +1477,9 @@ export default function Home() {
                             {expanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
                           </button>
                         )}
+                        <button className="iconButton" title={labels.moveToTomorrow} aria-label={labels.moveToTomorrow} onClick={() => moveTaskToTomorrow(task)}>
+                          <CalendarPlus size={15} />
+                        </button>
                         <button className="iconButton success" title={labels.markTaskDone} aria-label={labels.markTaskDone} onClick={() => markTaskDone(task)}>
                           <CheckCircle2 size={15} />
                         </button>
@@ -1426,7 +1513,12 @@ export default function Home() {
                   {elapsedTasks.slice(0, 5).map((task) => (
                     <article className="historyItem elapsedTask" key={task.id ?? task.title}>
                       <div>
-                        <strong>{task.title}</strong>
+                        <div className="taskTitleRow">
+                          <strong>{task.title}</strong>
+                          {(task.carried_over_count ?? 0) > 0 && (
+                            <span className="carryBadge">{carriedOverLabel(task.carried_over_count ?? 0, language)}</span>
+                          )}
+                        </div>
                         <span>{task.due_at ? `${labels.due} ${displayDate(task.due_at, language)}` : labels.scheduledBlockPassed}</span>
                       </div>
                       <div className="itemActions">
