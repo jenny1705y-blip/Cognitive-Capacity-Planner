@@ -180,6 +180,42 @@ h2 {
   background: #fff1f2;
 }
 
+.deadlineRiskBanner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 14px 0;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  padding: 13px 14px;
+  color: #7c2d12;
+  background: #fff7ed;
+  box-shadow: 0 12px 30px rgba(124, 45, 18, 0.08);
+}
+
+.deadlineRiskBanner svg {
+  flex: 0 0 auto;
+  color: #ea580c;
+}
+
+.deadlineRiskBanner div {
+  display: grid;
+  gap: 4px;
+}
+
+.deadlineRiskBanner strong {
+  font-size: 0.94rem;
+  line-height: 1.35;
+}
+
+.deadlineRiskBanner p,
+.deadlineRiskBanner span {
+  margin: 0;
+  color: #9a3412;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
 .connectionLine {
   margin: -4px 0 14px;
   color: var(--muted);
@@ -274,8 +310,8 @@ h2 {
 }
 
 .viewToggle {
-  width: 176px;
-  grid-template-columns: repeat(2, 1fr);
+  width: 260px;
+  grid-template-columns: repeat(3, 1fr);
 }
 
 .sectionHeader h2,
@@ -300,6 +336,115 @@ h2 {
   display: block;
   width: 100%;
   min-height: 280px;
+}
+
+.weekGrid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(128px, 1fr));
+  gap: 10px;
+}
+
+.weekDayCard {
+  display: grid;
+  gap: 12px;
+  min-height: 176px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 13px;
+  color: var(--ink);
+  background: #fbfcfa;
+  text-align: left;
+  box-shadow: 0 10px 26px rgba(27, 39, 34, 0.05);
+}
+
+.weekDayCard:hover,
+.weekDayCard:focus {
+  border-color: #99d8cb;
+  background: #f1fbf8;
+  outline: none;
+}
+
+.weekDayCard.carry {
+  border-color: #b8c7ff;
+}
+
+.weekDayCard.risk {
+  border-color: #fecdd3;
+  background: #fff8f8;
+}
+
+.weekCardTop,
+.weekMetric,
+.weekFlags {
+  display: flex;
+  align-items: center;
+}
+
+.weekCardTop,
+.weekMetric {
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.weekCardTop strong {
+  font-size: 0.9rem;
+}
+
+.weekCardTop span {
+  border-radius: 999px;
+  padding: 3px 7px;
+  color: #0f5f56;
+  background: #e6f7f3;
+  font-size: 0.68rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.weekMetric {
+  align-items: flex-start;
+  flex-direction: column;
+}
+
+.weekMetric span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.weekMetric b {
+  font-size: 1rem;
+  line-height: 1.2;
+}
+
+.weekFlags {
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: auto;
+}
+
+.weekFlags span {
+  border-radius: 999px;
+  padding: 4px 7px;
+  color: var(--muted);
+  background: #edf1ed;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.weekFlags .carryFlag {
+  color: #1d4ed8;
+  background: #dbeafe;
+}
+
+.weekFlags .urgentFlag {
+  color: #92400e;
+  background: #fef3c7;
+}
+
+.weekFlags .riskFlag {
+  color: #9f1239;
+  background: #ffe4e6;
 }
 
 .gridLine {
@@ -388,12 +533,17 @@ h2 {
 }
 
 .blockItem {
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 12px;
   background: #fbfcfa;
+}
+
+.blockDetails {
+  min-width: 0;
 }
 
 .blockItem div,
@@ -484,6 +634,13 @@ h2 {
   color: white;
 }
 
+.blockReason {
+  margin: 4px 0 0;
+  color: #0f5f56;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
 .queuedTasks {
   margin-top: 18px;
   border-top: 1px solid var(--line);
@@ -530,6 +687,10 @@ h2 {
   padding: 9px 0;
 }
 
+.queuedList article.queueRisk {
+  background: #fff8f8;
+}
+
 .queuedList strong {
   font-size: 0.84rem;
 }
@@ -538,6 +699,20 @@ h2 {
   color: var(--muted);
   font-size: 0.78rem;
   text-align: right;
+}
+
+.queuedList .queueForecast {
+  border-radius: 999px;
+  padding: 4px 8px;
+  color: #0f5f56;
+  background: #e6f7f3;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.queuedList .queueForecast.danger {
+  color: #9f1239;
+  background: #ffe4e6;
 }
 
 .panel {
@@ -555,6 +730,7 @@ h2 {
 
 .demoClockActions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
 }
@@ -797,6 +973,22 @@ select {
   white-space: nowrap;
 }
 
+.riskBadge {
+  width: fit-content;
+  border-radius: 999px;
+  padding: 3px 7px;
+  color: #9a3412;
+  background: #ffedd5;
+  font-size: 0.72rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.riskInline {
+  color: #9a3412 !important;
+  font-weight: 750;
+}
+
 .taskAutomation,
 .taskComposer {
   margin-bottom: 10px;
@@ -825,6 +1017,12 @@ select {
 
 .taskItem.aiTask {
   border-left: 3px solid #5fb8aa;
+}
+
+.taskItem.taskAtRisk {
+  border-color: #fed7aa;
+  border-left: 3px solid #f97316;
+  background: #fffaf5;
 }
 
 .sourceBadge {
@@ -904,6 +1102,10 @@ select {
     max-height: none;
     overflow: visible;
   }
+
+  .weekGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 560px) {
@@ -919,6 +1121,10 @@ select {
 
   .viewToggle {
     width: 100%;
+  }
+
+  .weekGrid {
+    grid-template-columns: 1fr;
   }
 
   .metricPanel strong {
