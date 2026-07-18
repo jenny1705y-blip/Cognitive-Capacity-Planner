@@ -3,14 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
+  Bell,
   Brain,
   CalendarClock,
   CalendarCheck,
   CalendarPlus,
   CheckCircle2,
   ChevronDown,
-  ChevronUp,
-  Clock3,
   Coffee,
   History,
   Loader2,
@@ -18,6 +17,7 @@ import {
   Pencil,
   Plus,
   RotateCcw,
+  Settings as SettingsIcon,
   Sparkles,
   Trash2,
   TimerReset
@@ -41,6 +41,7 @@ const LANGUAGE_STORAGE_KEY = "cognitive-capacity-planner-language";
 
 type Language = "en" | "ko";
 type ViewDate = "today" | "tomorrow" | "week";
+type ActivePanel = "plan" | "sleep" | "caffeine";
 type WeekTaskPlacement = {
   task: StudyTask;
   dayOffset: number | null;
@@ -72,6 +73,20 @@ const copy = {
     connectCalendar: "Connect calendar",
     reconnectCalendar: "Reconnect calendar",
     calendarConnected: "Calendar connected",
+    messages: "Messages",
+    noMessages: "No messages right now.",
+    connectedMessage: "Google Calendar is linked.",
+    reconnectMessage: "Google Calendar permission needs renewal.",
+    moreDeadlineRisks: "More tasks are also at deadline risk.",
+    planTab: "Plan",
+    bodyTab: "Body",
+    settingsTab: "Settings",
+    planBuilder: "Plan builder",
+    todaysPlan: "Today's plan",
+    createPlan: "Create plan",
+    scheduleCurrent: "Schedule current tasks",
+    bodyInputs: "Body inputs",
+    demoSettings: "Demo & settings",
     deviceTime: "Device time",
     plannerNow: "Planner now",
     rightNow: "Right now",
@@ -87,8 +102,7 @@ const copy = {
     tomorrow: "Tomorrow",
     week: "This week",
     backToWeek: "Back to week",
-    forecastOnly: "Forecast only",
-    weekHint: "Client-side forecast from the next 7 daily capacity curves. AI scheduling still places only the next 24 hours.",
+    weekHint: "7-day capacity forecast.",
     peakShort: "Peak",
     plannedShort: "Planned",
     carryoverFlag: "Carry-over",
@@ -100,7 +114,6 @@ const copy = {
     scheduleWithAi: "Schedule with AI",
     noAiBlocks: "No AI blocks yet. Add tasks, connect Google Calendar, then run the scheduler.",
     queuedTitle: "Queued for a later pass",
-    queuedHint: "Saved tasks outside the current 24-hour placement window.",
     demoClock: "Demo clock",
     running: "Running",
     plannerDateTime: "Planner date and time",
@@ -154,6 +167,14 @@ const copy = {
     addTask: "Add task",
     noActiveTasks: "No active tasks at the current planner time.",
     due: "Due",
+    noDueDate: "No due date",
+    details: "Details",
+    hideDetails: "Hide details",
+    selected: "selected",
+    selectTask: "Select task",
+    queueSelected: "Queue",
+    completeSelected: "Complete",
+    deleteSelected: "Delete",
     calendarSource: "Calendar source",
     reconnectGoogleNotice: "Google Calendar permission expired. Reconnect calendar once to continue.",
     hideCalendarSource: "Hide calendar source",
@@ -176,6 +197,20 @@ const copy = {
     connectCalendar: "캘린더 연결",
     reconnectCalendar: "캘린더 재연결",
     calendarConnected: "캘린더 연결됨",
+    messages: "메시지",
+    noMessages: "현재 메시지가 없습니다.",
+    connectedMessage: "Google Calendar가 연결되어 있습니다.",
+    reconnectMessage: "Google Calendar 권한을 다시 승인해야 합니다.",
+    moreDeadlineRisks: "다른 과제도 마감 위험 상태입니다.",
+    planTab: "계획",
+    bodyTab: "컨디션",
+    settingsTab: "설정",
+    planBuilder: "계획 만들기",
+    todaysPlan: "오늘 계획",
+    createPlan: "계획 자동 생성",
+    scheduleCurrent: "현재 과제 배치",
+    bodyInputs: "컨디션 입력",
+    demoSettings: "데모 및 설정",
     deviceTime: "기기 시간",
     plannerNow: "플래너 시간",
     rightNow: "현재 컨디션",
@@ -191,8 +226,7 @@ const copy = {
     tomorrow: "내일",
     week: "이번주",
     backToWeek: "이번주로 돌아가기",
-    forecastOnly: "예상",
-    weekHint: "다음 7일의 역량 곡선을 클라이언트에서 계산한 예상입니다. AI 스케줄러는 지금처럼 다음 24시간만 실제 배치합니다.",
+    weekHint: "7일 역량 예상입니다.",
     peakShort: "최고",
     plannedShort: "예정",
     carryoverFlag: "이월",
@@ -204,7 +238,6 @@ const copy = {
     scheduleWithAi: "AI로 배치",
     noAiBlocks: "아직 AI 블록이 없습니다. 과제를 추가하고 Google Calendar를 연결한 뒤 스케줄러를 실행하세요.",
     queuedTitle: "다음 회차 대기",
-    queuedHint: "현재 24시간 배치 구간 밖에 저장된 과제입니다.",
     demoClock: "데모 시계",
     running: "실행 중",
     plannerDateTime: "플래너 날짜와 시간",
@@ -258,6 +291,14 @@ const copy = {
     addTask: "과제 추가",
     noActiveTasks: "현재 플래너 시간에 활성 과제가 없습니다.",
     due: "마감",
+    noDueDate: "마감일 없음",
+    details: "상세",
+    hideDetails: "접기",
+    selected: "개 선택됨",
+    selectTask: "과제 선택",
+    queueSelected: "이월",
+    completeSelected: "완료",
+    deleteSelected: "삭제",
     calendarSource: "캘린더 출처",
     reconnectGoogleNotice: "Google Calendar 권한이 만료되었습니다. 계속하려면 캘린더를 다시 연결하세요.",
     hideCalendarSource: "캘린더 출처 숨기기",
@@ -845,8 +886,8 @@ function CapacityChart({
         <defs>
           <linearGradient id="capacityLine" x1="0" x2="1">
             <stop offset="0%" stopColor="#0f766e" />
-            <stop offset="48%" stopColor="#2563eb" />
-            <stop offset="100%" stopColor="#be123c" />
+            <stop offset="48%" stopColor="#2f6fdb" />
+            <stop offset="100%" stopColor="#c0324b" />
           </linearGradient>
         </defs>
         {[0, 25, 50, 75, 100].map((tick) => {
@@ -928,7 +969,6 @@ function WeekForecastGrid({
         >
           <div className="weekCardTop">
             <strong>{dayLabel(day.start, language)}</strong>
-            <span>{labels.forecastOnly}</span>
           </div>
           <div className="weekMetric">
             <span>{labels.peakShort}</span>
@@ -985,6 +1025,10 @@ export default function Home() {
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
   const [viewDate, setViewDate] = useState<ViewDate>("today");
   const [weekDetailOffset, setWeekDetailOffset] = useState<number | null>(null);
+  const [activePanel, setActivePanel] = useState<ActivePanel>("plan");
+  const [messagesOpen, setMessagesOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
   const labels = copy[language];
 
   const selectedDayOffset = useMemo(() => {
@@ -1080,6 +1124,41 @@ export default function Home() {
   );
   const atRiskTasks = useMemo(() => deadlineRisks.filter((risk) => risk.at_risk), [deadlineRisks]);
   const topDeadlineRisk = atRiskTasks[0];
+  const selectedTasks = useMemo(
+    () => planningTasks.filter((task) => selectedTaskIds.includes(taskIdentity(task))),
+    [planningTasks, selectedTaskIds]
+  );
+  const notificationItems = useMemo(() => {
+    const items: { type: "good" | "bad" | "neutral"; title: string; message: string }[] = [];
+    if (notice) {
+      items.push({ type: notice.type, title: labels.messages, message: notice.message });
+    }
+    if (topDeadlineRisk) {
+      items.push({
+        type: "bad",
+        title: labels.deadlineRiskBadge,
+        message: `${deadlineRiskWarning(topDeadlineRisk, language)} ${deadlineRiskSuggestion(topDeadlineRisk, language)}`
+      });
+      if (atRiskTasks.length > 1) {
+        items.push({
+          type: "bad",
+          title: labels.deadlineRiskBadge,
+          message: `${atRiskTasks.length - 1} ${labels.moreDeadlineRisks}`
+        });
+      }
+    }
+    if (googleNeedsReconnect) {
+      items.push({ type: "neutral", title: labels.reconnectCalendar, message: labels.reconnectMessage });
+    } else if (googleConnected) {
+      items.push({
+        type: "good",
+        title: labels.calendarConnected,
+        message: googleEmail ? `${labels.connectedMessage} ${googleEmail}` : labels.connectedMessage
+      });
+    }
+    return items;
+  }, [atRiskTasks.length, googleConnected, googleEmail, googleNeedsReconnect, labels, language, notice, topDeadlineRisk]);
+  const hasUnreadMessages = notificationItems.length > 0;
   const caffeinePreview = useMemo(
     () =>
       estimateCaffeineSleepForecast({
@@ -1204,6 +1283,14 @@ export default function Home() {
     if (!mounted || loading) return;
     console.table(deadlineRiskRows);
   }, [deadlineRiskLogKey, loading, mounted]);
+
+  useEffect(() => {
+    const availableTaskIds = new Set(planningTasks.map(taskIdentity));
+    setSelectedTaskIds((current) => {
+      const next = current.filter((id) => availableTaskIds.has(id));
+      return next.length === current.length ? current : next;
+    });
+  }, [planningTasks]);
 
   useEffect(() => {
     if (!mounted) return;
@@ -1447,6 +1534,66 @@ export default function Home() {
     }
   }
 
+  async function createPlan() {
+    if (!googleConnected || !token) {
+      await runAgent();
+      return;
+    }
+
+    setTaskGenerating(true);
+    setAgentRunning(true);
+    setNotice({
+      type: "neutral",
+      message: language === "ko" ? "캘린더에서 과제를 찾고 바로 배치하는 중입니다." : "Finding calendar tasks and placing them on the curve."
+    });
+
+    try {
+      const calendarResult = await api<{ explanation: string; tasks: StudyTask[] }>(
+        "/api/agent/generate-tasks",
+        token,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            startIso: plannerStart.toISOString()
+          })
+        },
+        AGENT_TIMEOUT_MS
+      );
+      const existingTitles = new Set(tasks.map((task) => task.title.trim().toLowerCase()));
+      const newCalendarTasks = calendarResult.tasks.filter((task) => !existingTitles.has(task.title.trim().toLowerCase()));
+      const mergedTasks = uniqueStudyTasks([...newCalendarTasks, ...tasks]);
+      setTasks(mergedTasks);
+
+      const scheduleCandidates = tasksBeforePlannerNow(mergedTasks, blocks, plannerStart);
+      const scheduleResult = await scheduleTasksForStart({
+        tasksToSchedule: scheduleCandidates,
+        curveForStart: todayCurve,
+        startAt: plannerStart,
+        emptyMessage: language === "ko" ? "배치할 활성 과제가 없습니다." : "No active tasks are available to schedule."
+      });
+      const generatedText =
+        language === "ko"
+          ? `${newCalendarTasks.length}개 캘린더 과제를 반영했습니다.`
+          : `${newCalendarTasks.length} calendar task${newCalendarTasks.length === 1 ? "" : "s"} added.`;
+      setNotice({
+        type: scheduleResult.source === "openai-mcp" ? "good" : "neutral",
+        message: `${generatedText} ${scheduleResult.explanation} ${scheduleSummary(scheduleCandidates, scheduleResult.blocks, plannerStart, language)}`
+      });
+    } catch (error) {
+      if (isGoogleReconnectError(error)) {
+        setGoogleConnected(false);
+        setGoogleNeedsReconnect(true);
+        setNotice({ type: "neutral", message: labels.reconnectGoogleNotice });
+      } else {
+        setNotice({ type: "bad", message: error instanceof Error ? error.message : language === "ko" ? "계획을 만들 수 없습니다." : "Could not create the plan." });
+      }
+    } finally {
+      setTaskGenerating(false);
+      setAgentRunning(false);
+    }
+  }
+
   function startSleepEdit(log: SleepLog) {
     setEditingSleepId(log.id ?? null);
     setSleepStart(toLocalInput(new Date(log.sleep_start)));
@@ -1548,6 +1695,46 @@ export default function Home() {
     if (!updated) return;
     await clearScheduleBlocksForTask(task);
     setNotice({ type: "good", message: `Moved to tomorrow: ${task.title}.` });
+  }
+
+  function toggleTaskSelection(task: StudyTask) {
+    const key = taskIdentity(task);
+    setSelectedTaskIds((current) => (current.includes(key) ? current.filter((id) => id !== key) : [...current, key]));
+  }
+
+  async function queueSelectedTasks() {
+    for (const task of selectedTasks) {
+      const updated = await carryTaskToNextPass(task);
+      if (updated) await clearScheduleBlocksForTask(task);
+    }
+    setNotice({
+      type: "good",
+      message: language === "ko" ? `${selectedTasks.length}개 과제를 이월했습니다.` : `${selectedTasks.length} task${selectedTasks.length === 1 ? "" : "s"} queued.`
+    });
+    setSelectedTaskIds([]);
+  }
+
+  async function completeSelectedTasks() {
+    for (const task of selectedTasks) {
+      const updated = await patchTask(task, { status: "completed" });
+      if (updated) await clearScheduleBlocksForTask(task);
+    }
+    setNotice({
+      type: "good",
+      message: language === "ko" ? `${selectedTasks.length}개 과제를 완료 처리했습니다.` : `${selectedTasks.length} task${selectedTasks.length === 1 ? "" : "s"} completed.`
+    });
+    setSelectedTaskIds([]);
+  }
+
+  async function deleteSelectedTasks() {
+    for (const task of selectedTasks) {
+      await deleteTask(task);
+    }
+    setNotice({
+      type: "neutral",
+      message: language === "ko" ? `${selectedTasks.length}개 과제를 삭제했습니다.` : `${selectedTasks.length} task${selectedTasks.length === 1 ? "" : "s"} deleted.`
+    });
+    setSelectedTaskIds([]);
   }
 
   async function connectGoogle() {
@@ -1752,6 +1939,99 @@ export default function Home() {
           <h1>{labels.title}</h1>
         </div>
         <div className="topbarActions">
+          <div className="messageCenter">
+            <button
+              className={`iconButton messageButton ${hasUnreadMessages ? "hasMessages" : ""}`}
+              title={labels.messages}
+              aria-label={labels.messages}
+              onClick={() => {
+                setSettingsOpen(false);
+                setMessagesOpen((open) => !open);
+              }}
+            >
+              <Bell size={18} />
+              {hasUnreadMessages && <span className="messageDot" />}
+            </button>
+            {messagesOpen && (
+              <div className="messagePopover">
+                <div className="messagePopoverHeader">
+                  <strong>{labels.messages}</strong>
+                  {hasUnreadMessages && <span>{notificationItems.length}</span>}
+                </div>
+                {notificationItems.length === 0 ? (
+                  <p className="panelHint">{labels.noMessages}</p>
+                ) : (
+                  <div className="messageList">
+                    {notificationItems.map((item, index) => (
+                      <article className={`messageItem ${item.type}`} key={`${item.title}-${index}`}>
+                        {item.type === "bad" && <AlertTriangle size={16} />}
+                        <div>
+                          <strong>{item.title}</strong>
+                          <p>{item.message}</p>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          <div className="messageCenter">
+            <button
+              className={`iconButton settingsButton ${settingsOpen ? "active" : ""}`}
+              title={labels.settingsTab}
+              aria-label={labels.settingsTab}
+              onClick={() => {
+                setMessagesOpen(false);
+                setSettingsOpen((open) => !open);
+              }}
+            >
+              <SettingsIcon size={18} />
+            </button>
+            {settingsOpen && (
+              <div className="settingsPopover">
+                <div className="messagePopoverHeader">
+                  <strong>{labels.settingsTab}</strong>
+                </div>
+                <div className={`settingsPopoverSection demoClockPanel ${demoClockAnchor ? "active" : ""}`}>
+                  <div className="panelTitleRow">
+                    <h2><CalendarClock size={18} /> {labels.demoClock}</h2>
+                    {demoClockAnchor && <span className="demoBadge">{labels.running}</span>}
+                  </div>
+                  <label>
+                    {labels.plannerDateTime}
+                    <input type="datetime-local" value={demoTimeInput} onChange={(event) => setDemoTimeInput(event.target.value)} />
+                  </label>
+                  <div className="demoClockActions">
+                    <button className="secondaryButton" onClick={saveDemoClock}>
+                      <CalendarClock size={16} />
+                      {labels.setDemoTime}
+                    </button>
+                    <button className="secondaryButton" onClick={closeDemoDay} disabled={dayClosing || agentRunning || loading} title={labels.closeDayTitle}>
+                      {dayClosing ? <Loader2 className="spin" size={16} /> : <TimerReset size={16} />}
+                      {labels.closeDay}
+                    </button>
+                    {demoClockAnchor && (
+                      <button className="iconButton" title={labels.resetDeviceTime} aria-label={labels.resetDeviceTime} onClick={resetDemoClock}>
+                        <RotateCcw size={16} />
+                      </button>
+                    )}
+                  </div>
+                  <p className="panelHint">{labels.demoClockHint}</p>
+                </div>
+                <div className="settingsPopoverSection">
+                  <h2>{labels.chronotype}</h2>
+                  <div className="segmented">
+                    {(["morning", "neutral", "evening"] as Chronotype[]).map((type) => (
+                      <button className={chronotype === type ? "active" : ""} key={type} onClick={() => saveChronotype(type)}>
+                        {labels[type]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
           <div className="languageToggle" aria-label="Language">
             {(["en", "ko"] as Language[]).map((option) => (
               <button className={language === option ? "active" : ""} key={option} onClick={() => changeLanguage(option)}>
@@ -1766,45 +2046,7 @@ export default function Home() {
         </div>
       </section>
 
-      {notice && <div className={`notice ${notice.type}`}>{notice.message}</div>}
-      {topDeadlineRisk && (
-        <section className="deadlineRiskBanner">
-          <AlertTriangle size={22} />
-          <div>
-            <strong>{deadlineRiskWarning(topDeadlineRisk, language)}</strong>
-            <p>{deadlineRiskSuggestion(topDeadlineRisk, language)}</p>
-            {atRiskTasks.length > 1 && (
-              <span>
-                {language === "ko"
-                  ? `추가로 ${atRiskTasks.length - 1}개 과제도 마감 위험 상태입니다.`
-                  : `${atRiskTasks.length - 1} more task${atRiskTasks.length - 1 === 1 ? "" : "s"} also at deadline risk.`}
-              </span>
-            )}
-          </div>
-        </section>
-      )}
-      {googleConnected && (
-        <p className="connectionLine">
-          {language === "ko"
-            ? `Google Calendar 연결됨${googleEmail ? ` (${googleEmail})` : ""}.`
-            : `Google Calendar linked${googleEmail ? ` as ${googleEmail}` : ""}.`}
-        </p>
-      )}
-      {googleNeedsReconnect && (
-        <p className="connectionLine">
-          {language === "ko"
-            ? "Google Calendar는 연결되어 있지만, 충돌 확인 권한을 다시 승인해야 합니다."
-            : "Google Calendar is linked, but calendar availability permission needs renewal."}
-        </p>
-      )}
-
       <section className="dashboard">
-        <div className="metricPanel">
-          <Clock3 size={22} />
-          <span>{labels.deviceTime}</span>
-          <strong className="clockValue">{displayClock(deviceNow, language)}</strong>
-          <small>{displayDay(deviceNow, language)}</small>
-        </div>
         <div className={`metricPanel ${demoClockAnchor ? "demoMetric" : ""}`}>
           <CalendarClock size={22} />
           <span>{labels.plannerNow}</span>
@@ -1860,10 +2102,6 @@ export default function Home() {
                   {labels.backToWeek}
                 </button>
               )}
-              <button className="primaryButton" onClick={runAgent} disabled={agentRunning || loading} title={planningTasks.length === 0 ? "Add at least one active task first" : "Schedule tasks around calendar conflicts"}>
-                {agentRunning ? <Loader2 className="spin" size={18} /> : <Sparkles size={18} />}
-                {labels.scheduleWithAi}
-              </button>
             </div>
           </div>
           {isWeekOverview ? (
@@ -1892,9 +2130,12 @@ export default function Home() {
                           <span>
                             {displayDate(block.start_at, language)} - {displayDate(block.end_at, language)}
                           </span>
-                          <p className="blockReason">{reason}</p>
                         </div>
                         <b>{Math.round(block.capacity_score ?? 0)}</b>
+                        <details className="blockReasonDisclosure">
+                          <summary title={reason}>?</summary>
+                          <p>{reason}</p>
+                        </details>
                       </article>
                     );
                   })
@@ -1909,7 +2150,6 @@ export default function Home() {
                 <h3>{labels.queuedTitle}</h3>
                 <span>{queuedTasks.length}</span>
               </div>
-              <p className="queuedHint">{labels.queuedHint}</p>
               <div className="queuedList">
                 {queuedTasks.map((task) => {
                   const placement = weeklyPlacementByTask.get(taskIdentity(task));
@@ -1919,8 +2159,10 @@ export default function Home() {
                       : labels.difficultBeforeDue;
                   return (
                     <article className={placement?.status === "missed_due" ? "queueRisk" : ""} key={task.id ?? task.title}>
-                      <strong>{task.title}</strong>
-                      <span>{task.due_at ? `${labels.due} ${displayDate(task.due_at, language)}` : `${task.estimated_minutes}${language === "ko" ? "분" : " min"}`}</span>
+                      <div>
+                        <strong>{task.title}</strong>
+                        <span>{task.due_at ? `${labels.due} ${displayDate(task.due_at, language)}` : `${task.estimated_minutes}${language === "ko" ? "분" : " min"}`}</span>
+                      </div>
                       <span className={placement?.status === "missed_due" ? "queueForecast danger" : "queueForecast"}>{forecastText}</span>
                     </article>
                   );
@@ -1931,45 +2173,36 @@ export default function Home() {
         </div>
 
         <aside className="sideColumn">
-          <section className={`panel demoClockPanel ${demoClockAnchor ? "active" : ""}`}>
-            <div className="panelTitleRow">
-              <h2><CalendarClock size={18} /> {labels.demoClock}</h2>
-              {demoClockAnchor && <span className="demoBadge">{labels.running}</span>}
-            </div>
-            <label>
-              {labels.plannerDateTime}
-              <input type="datetime-local" value={demoTimeInput} onChange={(event) => setDemoTimeInput(event.target.value)} />
-            </label>
-            <div className="demoClockActions">
-              <button className="secondaryButton" onClick={saveDemoClock}>
-                <CalendarClock size={16} />
-                {labels.setDemoTime}
-              </button>
-              <button className="secondaryButton" onClick={closeDemoDay} disabled={dayClosing || agentRunning || loading} title={labels.closeDayTitle}>
-                {dayClosing ? <Loader2 className="spin" size={16} /> : <TimerReset size={16} />}
-                {labels.closeDay}
-              </button>
-              {demoClockAnchor && (
-                <button className="iconButton" title={labels.resetDeviceTime} aria-label={labels.resetDeviceTime} onClick={resetDemoClock}>
-                  <RotateCcw size={16} />
-                </button>
-              )}
-            </div>
-            <p className="panelHint">{labels.demoClockHint}</p>
-          </section>
-
-          <section className="panel">
-            <h2>{labels.chronotype}</h2>
-            <div className="segmented">
-              {(["morning", "neutral", "evening"] as Chronotype[]).map((type) => (
-                <button className={chronotype === type ? "active" : ""} key={type} onClick={() => saveChronotype(type)}>
-                  {labels[type]}
+          <section className="commandPanel" aria-label={language === "ko" ? "플래너 도구" : "Planner tools"}>
+            <div className="commandTabs">
+              {([
+                ["plan", labels.planTab],
+                ["sleep", labels.sleep],
+                ["caffeine", labels.caffeine]
+              ] as const).map(([panel, label]) => (
+                <button className={activePanel === panel ? "active" : ""} key={panel} onClick={() => setActivePanel(panel)}>
+                  {label}
                 </button>
               ))}
             </div>
           </section>
 
-          <section className="panel">
+          <section className={`panel planHeroPanel ${activePanel !== "plan" ? "hiddenPanel" : ""}`}>
+            <div>
+              <span className="miniLabel"><Sparkles size={14} /> {labels.planBuilder}</span>
+              <h2>{labels.todaysPlan}</h2>
+            </div>
+            <button className="primaryButton full" onClick={createPlan} disabled={agentRunning || taskGenerating || loading || (!googleConnected && planningTasks.length === 0)}>
+              {agentRunning || taskGenerating ? <Loader2 className="spin" size={18} /> : <Sparkles size={18} />}
+              {labels.createPlan}
+            </button>
+            <button className="secondaryButton full" onClick={runAgent} disabled={agentRunning || loading || planningTasks.length === 0}>
+              {agentRunning ? <Loader2 className="spin" size={17} /> : <TimerReset size={17} />}
+              {labels.scheduleCurrent}
+            </button>
+          </section>
+
+          <section className={`panel ${activePanel !== "sleep" ? "hiddenPanel" : ""}`}>
             <h2>
               <Moon size={18} /> {labels.sleep}
             </h2>
@@ -2023,7 +2256,7 @@ export default function Home() {
             </div>
           </section>
 
-          <section className="panel">
+          <section className={`panel ${activePanel !== "caffeine" ? "hiddenPanel" : ""}`}>
             <h2>
               <Coffee size={18} /> {labels.caffeine}
             </h2>
@@ -2087,16 +2320,9 @@ export default function Home() {
             </div>
           </section>
 
-          <section className="panel">
+          <section className={`panel ${activePanel !== "plan" ? "hiddenPanel" : ""}`}>
             <div className="panelTitleRow">
               <h2>{labels.tasks} <span className="countBadge">{planningTasks.length}</span></h2>
-            </div>
-            <div className="taskAutomation">
-              <span className="miniLabel"><CalendarCheck size={14} /> {labels.calendarAgent}</span>
-              <button className="secondaryButton full calendarTaskButton" onClick={generateCalendarTasks} disabled={taskGenerating}>
-                {taskGenerating ? <Loader2 className="spin" size={17} /> : <CalendarPlus size={17} />}
-                {labels.generateFromCalendar}
-              </button>
             </div>
             <div className="taskComposer">
               <span className="miniLabel">{labels.manualTask}</span>
@@ -2114,28 +2340,71 @@ export default function Home() {
                 {labels.addTask}
               </button>
             </div>
+            {selectedTasks.length > 0 && (
+              <div className="taskBatchBar">
+                <span>
+                  {selectedTasks.length} {labels.selected}
+                </span>
+                <div className="batchActions">
+                  <button className="secondaryButton" onClick={queueSelectedTasks}>
+                    <CalendarPlus size={15} />
+                    {labels.queueSelected}
+                  </button>
+                  <button className="secondaryButton" onClick={completeSelectedTasks}>
+                    <CheckCircle2 size={15} />
+                    {labels.completeSelected}
+                  </button>
+                  <button className="secondaryButton dangerButton" onClick={deleteSelectedTasks}>
+                    <Trash2 size={15} />
+                    {labels.deleteSelected}
+                  </button>
+                </div>
+              </div>
+            )}
             <div className="taskList">
               {planningTasks.length === 0 ? (
                 <p className="panelHint">{labels.noActiveTasks}</p>
               ) : planningTasks.map((task) => {
                 const provenance = decodeCalendarTaskProvenance(task.description);
-                const taskKey = task.id ?? task.title;
+                const taskKey = taskIdentity(task);
                 const expanded = expandedTaskId === taskKey;
+                const selected = selectedTaskIds.includes(taskKey);
                 const carryCount = task.carried_over_count ?? 0;
                 const deadlineRisk = deadlineRiskByTask.get(taskIdentity(task));
                 return (
-                  <article className={`taskItem ${provenance ? "aiTask" : ""} ${deadlineRisk?.at_risk ? "taskAtRisk" : ""}`} key={taskKey}>
-                    <div className="taskMain">
-                      <div>
+                  <article className={`taskItem selectableTask ${selected ? "selected" : ""} ${provenance ? "aiTask" : ""} ${deadlineRisk?.at_risk ? "taskAtRisk" : ""}`} key={taskKey}>
+                    <div className="taskCompactRow">
+                      <button
+                        className={`selectCircle ${selected ? "active" : ""}`}
+                        title={labels.selectTask}
+                        aria-label={labels.selectTask}
+                        onClick={() => toggleTaskSelection(task)}
+                      >
+                        {selected && <span className="checkGlyph" />}
+                      </button>
+                      <div className="taskSummary">
                         <div className="taskTitleRow">
                           <strong>{task.title}</strong>
                           {deadlineRisk?.at_risk && <span className="riskBadge">{labels.deadlineRiskBadge}</span>}
-                          {carryCount > 0 && <span className="carryBadge">{carriedOverLabel(carryCount, language)}</span>}
                         </div>
+                        <span>{task.due_at ? `${labels.due} ${displayDate(task.due_at, language)}` : labels.noDueDate}</span>
+                      </div>
+                      <button
+                        className="expandTaskButton"
+                        aria-expanded={expanded}
+                        aria-label={expanded ? labels.hideDetails : labels.details}
+                        title={expanded ? labels.hideDetails : labels.details}
+                        onClick={() => setExpandedTaskId(expanded ? null : taskKey)}
+                      >
+                        <ChevronDown className={expanded ? "expandedChevron open" : "expandedChevron"} size={18} />
+                      </button>
+                    </div>
+                    {expanded && (
+                      <div className="taskExpandedDetails">
                         <span>
                           {task.estimated_minutes}{language === "ko" ? "분" : " min"} · {bandForTask(task, language)}
                         </span>
-                        {task.due_at && <span>{labels.due} {displayDate(task.due_at, language)}</span>}
+                        {carryCount > 0 && <span className="carryBadge">{carriedOverLabel(carryCount, language)}</span>}
                         {deadlineRisk?.at_risk && (
                           <span className="riskInline">
                             {language === "ko"
@@ -2143,37 +2412,16 @@ export default function Home() {
                               : `Needs ${deadlineRisk.requiredMinutes} min / ${deadlineRisk.availableMinutes} min available · ${dDayLabel(deadlineRisk.daysRemaining)}`}
                           </span>
                         )}
-                      </div>
-                      <div className="itemActions">
                         {provenance && (
-                          <button
-                            className="iconButton sourceButton"
-                            title={expanded ? labels.hideCalendarSource : labels.viewCalendarSource}
-                            aria-label={expanded ? labels.hideCalendarSource : labels.viewCalendarSource}
-                            onClick={() => setExpandedTaskId(expanded ? null : taskKey)}
-                          >
-                            {expanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-                          </button>
+                          <>
+                            <span className="sourceBadge"><CalendarCheck size={12} /> {labels.calendarSource}</span>
+                            <div className="taskSourceDetails">
+                              <strong>{provenance.calendarEventTitle}</strong>
+                              {provenance.calendarEventAt && <span>{displayDate(provenance.calendarEventAt, language)}</span>}
+                              <p>{provenance.reason}</p>
+                            </div>
+                          </>
                         )}
-                        <button className="iconButton" title={labels.moveToTomorrow} aria-label={labels.moveToTomorrow} onClick={() => moveTaskToTomorrow(task)}>
-                          <CalendarPlus size={15} />
-                        </button>
-                        <button className="iconButton success" title={labels.markTaskDone} aria-label={labels.markTaskDone} onClick={() => markTaskDone(task)}>
-                          <CheckCircle2 size={15} />
-                        </button>
-                        <button className="iconButton danger" title={labels.deleteTask} aria-label={labels.deleteTask} onClick={() => deleteTask(task)}>
-                          <Trash2 size={15} />
-                        </button>
-                      </div>
-                    </div>
-                    {provenance && (
-                      <span className="sourceBadge"><CalendarCheck size={12} /> {labels.calendarSource}</span>
-                    )}
-                    {provenance && expanded && (
-                      <div className="taskSourceDetails">
-                        <strong>{provenance.calendarEventTitle}</strong>
-                        {provenance.calendarEventAt && <span>{displayDate(provenance.calendarEventAt, language)}</span>}
-                        <p>{provenance.reason}</p>
                       </div>
                     )}
                   </article>

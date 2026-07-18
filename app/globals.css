@@ -1,14 +1,18 @@
 :root {
-  --bg: #f6f7f4;
-  --ink: #17201d;
-  --muted: #66736e;
-  --line: #dce2dc;
+  --bg: #f4f8f6;
+  --ink: #13201c;
+  --muted: #63736d;
+  --line: #d7e4de;
   --panel: #ffffff;
-  --teal: #0f766e;
-  --blue: #2563eb;
-  --rose: #be123c;
-  --task-accent: #7c3aed;
-  --shadow: 0 18px 50px rgba(27, 39, 34, 0.08);
+  --panel-soft: #f8fbf9;
+  --mint: #e6f6f1;
+  --teal: #0f7f73;
+  --teal-dark: #0b5f58;
+  --blue: #2f6fdb;
+  --rose: #c0324b;
+  --amber: #d97706;
+  --task-accent: #2f6fdb;
+  --shadow: 0 18px 50px rgba(21, 41, 35, 0.08);
 }
 
 * {
@@ -37,9 +41,9 @@ button {
 }
 
 main {
-  width: min(1480px, 100%);
+  width: min(1440px, 100%);
   margin: 0 auto;
-  padding: 28px;
+  padding: 20px 24px 24px;
 }
 
 .topbar,
@@ -58,15 +62,144 @@ main {
 .topbar {
   justify-content: space-between;
   gap: 18px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
   border-bottom: 1px solid var(--line);
-  padding-bottom: 16px;
+  padding-bottom: 12px;
 }
 
 .topbarActions {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.messageCenter {
+  position: relative;
+}
+
+.messageButton {
+  position: relative;
+}
+
+.messageButton.hasMessages {
+  border-color: #fecdd3;
+  color: #be123c;
+  background: #fff7f7;
+}
+
+.messageDot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #dc2626;
+  box-shadow: 0 0 0 2px white;
+}
+
+.messagePopover,
+.settingsPopover {
+  position: absolute;
+  top: 44px;
+  right: 0;
+  z-index: 20;
+  width: min(380px, calc(100vw - 32px));
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: white;
+  box-shadow: var(--shadow);
+}
+
+.settingsPopover {
+  width: min(460px, calc(100vw - 32px));
+  display: grid;
+  gap: 12px;
+}
+
+.settingsButton.active {
+  border-color: #99d8cb;
+  color: var(--teal-dark);
+  background: var(--mint);
+}
+
+.settingsPopoverSection {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--panel-soft);
+}
+
+.settingsPopoverSection h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  font-size: 1rem;
+}
+
+.messagePopoverHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.messagePopoverHeader strong {
+  font-size: 0.95rem;
+}
+
+.messagePopoverHeader span {
+  display: grid;
+  min-width: 22px;
+  height: 22px;
+  place-items: center;
+  border-radius: 999px;
+  color: white;
+  background: var(--rose);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.messageList {
+  display: grid;
+  gap: 8px;
+}
+
+.messageItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 9px 10px;
+  color: var(--muted);
+  background: #fbfcfa;
+  font-size: 0.82rem;
+  line-height: 1.38;
+}
+
+.messageItem strong {
+  color: var(--ink);
+  font-size: 0.84rem;
+}
+
+.messageItem p {
+  margin: 2px 0 0;
+}
+
+.messageItem.bad {
+  border-color: #fed7aa;
+  color: #9a3412;
+  background: #fff7ed;
+}
+
+.messageItem.good {
+  border-color: #99d8cb;
+  color: #0f5f56;
+  background: #ecfdf8;
 }
 
 .languageToggle {
@@ -110,9 +243,9 @@ p {
 
 h1 {
   margin-bottom: 0;
-  font-size: clamp(2rem, 4vw, 4.1rem);
+  font-size: clamp(2.1rem, 3.2vw, 3.15rem);
   letter-spacing: 0;
-  line-height: 0.98;
+  line-height: 0.96;
 }
 
 h2 {
@@ -160,7 +293,7 @@ h2 {
 }
 
 .notice {
-  margin: 14px 0;
+  margin: 10px 0;
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 12px 14px;
@@ -184,7 +317,7 @@ h2 {
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  margin: 14px 0;
+  margin: 10px 0;
   border: 1px solid #fed7aa;
   border-radius: 8px;
   padding: 13px 14px;
@@ -224,9 +357,9 @@ h2 {
 
 .dashboard {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 12px;
-  margin-bottom: 16px;
+  margin-bottom: 14px;
 }
 
 .metricPanel {
@@ -234,15 +367,16 @@ h2 {
   gap: 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 18px;
+  min-height: 72px;
+  padding: 13px 14px;
   background: var(--panel);
   box-shadow: 0 10px 30px rgba(27, 39, 34, 0.06);
 }
 
 .metricPanel small {
   position: absolute;
-  right: 18px;
-  bottom: 7px;
+  right: 14px;
+  bottom: 6px;
   color: var(--muted);
   font-size: 0.7rem;
 }
@@ -253,44 +387,48 @@ h2 {
 
 .metricPanel span {
   color: var(--muted);
-  font-size: 0.9rem;
+  font-size: 0.82rem;
 }
 
 .metricPanel strong {
   margin-left: auto;
-  font-size: 1.7rem;
+  font-size: 1.45rem;
 }
 
 .demoMetric {
-  border-color: #c4b5fd;
-  background: #faf8ff;
+  border-color: #99d8cb;
+  background: #f0fbf8;
 }
 
 .workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(390px, 2fr);
   align-items: flex-start;
-  gap: 18px;
+  gap: 16px;
 }
 
 .mainColumn {
   flex: 1;
   min-width: 0;
   position: sticky;
-  top: 18px;
-  max-height: calc(100vh - 36px);
+  top: 16px;
+  max-height: calc(100vh - 176px);
   overflow-y: auto;
   scrollbar-gutter: stable;
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 18px;
+  padding: 16px;
   background: var(--panel);
   box-shadow: 0 16px 42px rgba(27, 39, 34, 0.07);
 }
 
 .sideColumn {
-  width: 380px;
+  width: 100%;
   display: grid;
-  gap: 14px;
-  max-height: calc(100vh - 36px);
+  gap: 12px;
+  position: sticky;
+  top: 16px;
+  max-height: calc(100vh - 176px);
   overflow-y: auto;
   padding-right: 4px;
   scrollbar-gutter: stable;
@@ -300,18 +438,23 @@ h2 {
 .sectionHeader {
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .curveActions {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 10px;
 }
 
 .viewToggle {
-  width: 260px;
+  width: 292px;
   grid-template-columns: repeat(3, 1fr);
+}
+
+.viewToggle button {
+  white-space: nowrap;
 }
 
 .sectionHeader h2,
@@ -319,10 +462,17 @@ h2 {
   margin-bottom: 0;
 }
 
+.sectionHeader h2 {
+  font-size: 1.45rem;
+  letter-spacing: 0;
+  line-height: 1.1;
+}
+
 .sectionHint {
   margin: 5px 0 0;
   color: var(--muted);
-  font-size: 0.84rem;
+  font-size: 0.88rem;
+  line-height: 1.35;
 }
 
 .chartShell {
@@ -335,26 +485,26 @@ h2 {
 .chartShell svg {
   display: block;
   width: 100%;
-  min-height: 280px;
+  min-height: 300px;
 }
 
 .weekGrid {
   display: grid;
-  grid-template-columns: repeat(7, minmax(128px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 9px;
 }
 
 .weekDayCard {
   display: grid;
-  gap: 12px;
-  min-height: 176px;
+  gap: 10px;
+  min-height: 138px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 13px;
+  padding: 12px;
   color: var(--ink);
   background: #fbfcfa;
   text-align: left;
-  box-shadow: 0 10px 26px rgba(27, 39, 34, 0.05);
+  box-shadow: none;
 }
 
 .weekDayCard:hover,
@@ -365,7 +515,7 @@ h2 {
 }
 
 .weekDayCard.carry {
-  border-color: #b8c7ff;
+  border-color: #9bb9f4;
 }
 
 .weekDayCard.risk {
@@ -387,16 +537,10 @@ h2 {
 }
 
 .weekCardTop strong {
-  font-size: 0.9rem;
-}
-
-.weekCardTop span {
-  border-radius: 999px;
-  padding: 3px 7px;
-  color: #0f5f56;
-  background: #e6f7f3;
-  font-size: 0.68rem;
-  font-weight: 800;
+  overflow: hidden;
+  font-size: 0.96rem;
+  line-height: 1.2;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -407,14 +551,15 @@ h2 {
 
 .weekMetric span {
   color: var(--muted);
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 800;
   text-transform: uppercase;
 }
 
 .weekMetric b {
-  font-size: 1rem;
+  font-size: 1.08rem;
   line-height: 1.2;
+  white-space: nowrap;
 }
 
 .weekFlags {
@@ -425,10 +570,10 @@ h2 {
 
 .weekFlags span {
   border-radius: 999px;
-  padding: 4px 7px;
+  padding: 4px 8px;
   color: var(--muted);
   background: #edf1ed;
-  font-size: 0.7rem;
+  font-size: 0.72rem;
   font-weight: 800;
 }
 
@@ -530,15 +675,19 @@ h2 {
   display: grid;
   gap: 10px;
   margin-top: 14px;
+  max-height: 254px;
+  overflow: auto;
+  padding-right: 4px;
 }
 
 .blockItem {
-  align-items: flex-start;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto 30px;
+  align-items: center;
   gap: 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 12px;
+  padding: 12px 14px;
   background: #fbfcfa;
 }
 
@@ -559,6 +708,19 @@ h2 {
 .panelHint {
   color: var(--muted);
   font-size: 0.9rem;
+}
+
+.blockDetails strong {
+  display: block;
+  overflow: hidden;
+  font-size: 1rem;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.blockDetails span {
+  font-size: 0.82rem;
 }
 
 .panelHint {
@@ -634,10 +796,48 @@ h2 {
   color: white;
 }
 
-.blockReason {
-  margin: 4px 0 0;
+.blockReasonDisclosure {
+  position: relative;
+}
+
+.blockReasonDisclosure summary {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  background: white;
+  font-size: 0.88rem;
+  font-weight: 900;
+  list-style: none;
+}
+
+.blockReasonDisclosure summary::-webkit-details-marker {
+  display: none;
+}
+
+.blockReasonDisclosure summary:hover {
+  border-color: #99d8cb;
   color: #0f5f56;
-  font-size: 0.78rem;
+  background: #f1fbf8;
+}
+
+.blockReasonDisclosure p {
+  position: absolute;
+  top: 34px;
+  right: 0;
+  z-index: 8;
+  width: 280px;
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  color: #0f5f56;
+  background: white;
+  box-shadow: var(--shadow);
+  font-size: 0.8rem;
   line-height: 1.45;
 }
 
@@ -657,7 +857,7 @@ h2 {
 
 .queuedHeader h3 {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: 1rem;
 }
 
 .queuedHeader span {
@@ -666,46 +866,47 @@ h2 {
   height: 24px;
   place-items: center;
   border-radius: 999px;
-  color: #5b21b6;
-  background: #ede9fe;
+  color: var(--teal-dark);
+  background: var(--mint);
   font-size: 0.75rem;
   font-weight: 800;
 }
 
-.queuedHint {
-  margin: 5px 0 8px;
-  color: var(--muted);
-  font-size: 0.8rem;
-}
-
 .queuedList {
   display: grid;
+  gap: 6px;
+  margin-top: 10px;
 }
 
 .queuedList article {
-  border-bottom: 1px solid #edf1ed;
-  padding: 9px 0;
+  border: 1px solid #edf1ed;
+  border-radius: 8px;
+  padding: 10px 11px;
+  background: #fbfcfa;
 }
 
 .queuedList article.queueRisk {
+  border-color: #fecdd3;
   background: #fff8f8;
 }
 
 .queuedList strong {
-  font-size: 0.84rem;
+  display: block;
+  font-size: 0.95rem;
+  line-height: 1.2;
 }
 
 .queuedList span {
   color: var(--muted);
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   text-align: right;
 }
 
 .queuedList .queueForecast {
   border-radius: 999px;
   padding: 4px 8px;
-  color: #0f5f56;
-  background: #e6f7f3;
+  color: var(--teal-dark);
+  background: var(--mint);
   font-weight: 800;
   white-space: nowrap;
 }
@@ -723,9 +924,63 @@ h2 {
   box-shadow: 0 12px 34px rgba(27, 39, 34, 0.06);
 }
 
+.commandPanel {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px;
+  background: rgba(244, 248, 246, 0.94);
+  backdrop-filter: blur(14px);
+}
+
+.commandTabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+}
+
+.commandTabs button {
+  min-height: 38px;
+  border: 0;
+  border-radius: 7px;
+  color: var(--muted);
+  background: transparent;
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.commandTabs button:hover {
+  color: var(--ink);
+  background: #edf1ed;
+}
+
+.commandTabs .active {
+  color: white;
+  background: var(--teal);
+  box-shadow: 0 8px 18px rgba(15, 118, 110, 0.22);
+}
+
+.hiddenPanel {
+  display: none !important;
+}
+
+.planHeroPanel {
+  display: grid;
+  gap: 10px;
+  border-color: #99d8cb;
+  background: linear-gradient(180deg, #f0fbf8 0%, #ffffff 64%);
+}
+
+.planHeroPanel h2 {
+  margin: 5px 0 0;
+  font-size: 1.25rem;
+}
+
 .demoClockPanel.active {
-  border-color: #c4b5fd;
-  background: #faf8ff;
+  border-color: #99d8cb;
+  background: #f0fbf8;
 }
 
 .demoClockActions {
@@ -743,8 +998,8 @@ h2 {
   margin-left: auto;
   border-radius: 999px;
   padding: 4px 8px;
-  color: #5b21b6;
-  background: #ede9fe;
+  color: var(--teal-dark);
+  background: var(--mint);
   font-size: 0.7rem;
   font-weight: 800;
   text-transform: uppercase;
@@ -787,8 +1042,8 @@ h2 {
   margin-left: 4px;
   place-items: center;
   border-radius: 999px;
-  color: #0f5f56;
-  background: #e6f7f3;
+  color: var(--teal-dark);
+  background: var(--mint);
   font-size: 0.72rem;
 }
 
@@ -813,7 +1068,7 @@ h2 {
   border-radius: 999px;
   padding: 2px 7px;
   color: var(--ink);
-  background: #edf1ed;
+  background: #edf3ef;
 }
 
 .historyList {
@@ -873,7 +1128,7 @@ h2 {
 }
 
 .elapsedTask {
-  background: #faf8ff;
+  background: #f4f8ff;
 }
 
 .textButton {
@@ -902,7 +1157,7 @@ select {
   border-radius: 8px;
   padding: 0 11px;
   color: var(--ink);
-  background: #fbfcfa;
+  background: var(--panel-soft);
 }
 
 .twoCols {
@@ -944,6 +1199,42 @@ select {
   overflow: auto;
 }
 
+.taskBatchBar {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0 10px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  padding: 9px 0;
+}
+
+.taskBatchBar > span {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.batchActions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.batchActions .secondaryButton {
+  min-height: 34px;
+  gap: 5px;
+  padding: 0 8px;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.dangerButton {
+  color: var(--rose);
+}
+
 .calendarTaskButton {
   margin-top: 8px;
 }
@@ -952,7 +1243,7 @@ select {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 10px;
-  background: #fbfcfa;
+  background: var(--panel-soft);
 }
 
 .taskTitleRow {
@@ -962,12 +1253,122 @@ select {
   gap: 6px;
 }
 
+.selectableTask {
+  overflow: hidden;
+  padding: 0 !important;
+}
+
+.selectableTask.selected {
+  border-color: #99d8cb;
+  background: #f0fbf8;
+}
+
+.taskCompactRow {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) 34px;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+}
+
+.selectCircle {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border: 1.5px solid #b7c5bd;
+  border-radius: 999px;
+  color: white;
+  background: white;
+  line-height: 1;
+}
+
+.selectCircle:hover {
+  border-color: var(--teal);
+}
+
+.selectCircle.active {
+  border-color: var(--teal);
+  background: var(--teal);
+}
+
+.checkGlyph {
+  display: block;
+  width: 10px;
+  height: 6px;
+  border-bottom: 2.5px solid currentColor;
+  border-left: 2.5px solid currentColor;
+  transform: rotate(-45deg) translate(1px, -1px);
+  transform-origin: center;
+}
+
+.selectCircle svg {
+  display: block;
+}
+
+.taskSummary {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
+
+.taskSummary strong {
+  overflow: hidden;
+  font-size: 1rem;
+  line-height: 1.16;
+  text-overflow: ellipsis;
+}
+
+.taskSummary > span {
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.2;
+}
+
+.expandTaskButton {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--muted);
+  background: transparent;
+}
+
+.expandTaskButton:hover {
+  border-color: #99d8cb;
+  color: var(--teal-dark);
+  background: var(--mint);
+}
+
+.expandedChevron {
+  color: var(--muted);
+  transition: transform 140ms ease;
+}
+
+.expandedChevron.open {
+  transform: rotate(180deg);
+}
+
+.taskExpandedDetails {
+  display: grid;
+  gap: 7px;
+  border-top: 1px solid var(--line);
+  padding: 10px 11px 12px 50px;
+}
+
+.taskExpandedDetails > span:first-child {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
 .carryBadge {
   width: fit-content;
   border-radius: 999px;
   padding: 3px 7px;
-  color: #4c1d95;
-  background: #ede9fe;
+  color: #1d4f91;
+  background: #e4efff;
   font-size: 0.72rem;
   font-weight: 800;
   white-space: nowrap;
@@ -978,7 +1379,7 @@ select {
   border-radius: 999px;
   padding: 3px 7px;
   color: #9a3412;
-  background: #ffedd5;
+  background: #fff1d6;
   font-size: 0.72rem;
   font-weight: 800;
   white-space: nowrap;
@@ -993,7 +1394,7 @@ select {
 .taskComposer {
   margin-bottom: 10px;
   padding: 10px;
-  background: #f7faf8;
+  background: var(--panel-soft);
 }
 
 .taskAutomation {
@@ -1020,9 +1421,9 @@ select {
 }
 
 .taskItem.taskAtRisk {
-  border-color: #fed7aa;
-  border-left: 3px solid #f97316;
-  background: #fffaf5;
+  border-color: #f9d38c;
+  border-left: 3px solid var(--amber);
+  background: #fffaf2;
 }
 
 .sourceBadge {
@@ -1030,8 +1431,8 @@ select {
   margin-top: 8px;
   border-radius: 999px;
   padding: 3px 7px;
-  color: #0f5f56;
-  background: #e6f7f3;
+  color: var(--teal-dark);
+  background: var(--mint);
   text-transform: none;
 }
 
@@ -1076,10 +1477,15 @@ select {
     padding: 18px;
   }
 
-  .topbar,
-  .workspace {
+  .topbar {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .workspace {
+    display: grid;
+    grid-template-columns: 1fr;
+    align-items: stretch;
   }
 
   .topbarActions {
@@ -1092,6 +1498,7 @@ select {
 
   .sideColumn {
     width: 100%;
+    position: static;
     max-height: none;
     overflow: visible;
     padding-right: 0;
@@ -1101,6 +1508,10 @@ select {
     position: static;
     max-height: none;
     overflow: visible;
+  }
+
+  .timeline {
+    max-height: none;
   }
 
   .weekGrid {
